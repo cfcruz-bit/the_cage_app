@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json.schemastore.org/base.json",
+  "name": "The Cage 2.0 — Nocturne",
+  "version": "0.1.0",
+  "source": "Extraído del objeto `A` del prototipo The Cage 2.0 - App.html",
+  "note": "Paleta cruda + mapeo semántico. Las pantallas consumen SOLO los nombres semánticos; los crudos existen para poder retunear la escala sin tocar componentes.",
+
+  "palette": {
+    "accent": "#e04a3a",
+    "accentEdge": "#c2231b",
+    "a100": "#f7f4ec",
+    "a200": "#ece7db",
+    "a300": "#ded6c4",
+    "a400": "#b8b1a0",
+    "a500": "#b02a20",
+    "a700": "#5e1a14",
+    "a800": "#2e2e2b",
+    "a900": "#191917",
+    "n200": "#edeae1",
+    "n300": "#dcd8cd",
+    "n400": "#b9b5a9",
+    "n500": "#8d8a80",
+    "n600": "#6b6862",
+    "n700": "#4c4a45",
+    "n800": "#2e2e2b",
+    "n900": "#1b1b1a",
+    "black": "#0a0a0a",
+    "surfaceRaised": "#131313"
+  },
+
+  "semantic": {
+    "bg": { "value": "{palette.black}", "use": "Fondo de pantalla" },
+    "bgRaised": { "value": "{palette.surfaceRaised}", "use": "Tarjetas, filas de lista" },
+    "bgSunken": { "value": "{palette.a900}", "use": "Bottom sheets, estados activos" },
+    "border": { "value": "{palette.n800}", "use": "Separadores y bordes de chip en reposo" },
+    "borderActive": { "value": "{palette.accent}", "use": "Chip seleccionado, set completado" },
+    "text": { "value": "{palette.n200}", "use": "Texto principal" },
+    "textMuted": { "value": "{palette.n500}", "use": "Metadatos, unidades, ayudas" },
+    "textFaint": { "value": "{palette.n600}", "use": "Tabs inactivas, etiquetas de eje" },
+    "accent": { "value": "{palette.accent}", "use": "Acción primaria, set activo, alerta de coach" },
+    "accentDim": { "value": "{palette.a700}", "use": "Barras de volumen en semanas pasadas" },
+    "onAccent": { "value": "{palette.a100}", "use": "Texto sobre fondo acento" },
+    "rowHighlight": { "value": "rgba(224,74,58,0.08)", "use": "Fila del siguiente set pendiente" }
+  },
+
+  "status": {
+    "complete": { "bg": "transparent", "fg": "{palette.n500}", "label": "Completa" },
+    "partial": { "bg": "{palette.n800}", "fg": "{palette.n300}", "label": "Parcial" },
+    "atLimit": { "bg": "{palette.a800}", "fg": "{palette.a100}", "label": "Al límite" },
+    "missed": { "bg": "{palette.n900}", "fg": "{palette.n500}", "label": "Perdida" }
+  },
+
+  "typography": {
+    "family": {
+      "sans": "Inter",
+      "note": "El prototipo empaquetaba Inter completa (18 subsets). En Expo cargar solo latin + latin-ext con expo-font."
+    },
+    "scale": {
+      "display": { "size": 32, "weight": 700, "tracking": -0.02 },
+      "title": { "size": 22, "weight": 600, "tracking": -0.01 },
+      "heading": { "size": 17, "weight": 600, "tracking": 0 },
+      "body": { "size": 15, "weight": 400, "tracking": 0 },
+      "meta": { "size": 13, "weight": 400, "tracking": 0 },
+      "label": { "size": 10.5, "weight": 500, "tracking": 0.28, "transform": "uppercase" },
+      "numeric": { "size": 15, "weight": 600, "features": ["tnum"] }
+    }
+  },
+
+  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "xxl": 32 },
+  "radius": { "chip": 4, "card": 10, "sheet": 20 },
+
+  "motion": {
+    "fadeIn": { "duration": 260, "easing": "ease-out" },
+    "listStagger": { "step": 80, "unit": "ms", "note": "exercises usa 80ms, clients 55ms, weeks 60ms" },
+    "roleEnter": { "duration": 300, "settle": 760 }
+  },
+
+  "icons": {
+    "set": "Phosphor",
+    "note": "El prototipo incrustaba el set completo (~2 MB). En Expo usar @expo/vector-icons o phosphor-react-native e importar solo los usados.",
+    "used": [
+      "ph-barbell",
+      "ph-chart-line-up",
+      "ph-list-dashes",
+      "ph-sliders-horizontal",
+      "ph-users-three",
+      "ph-rows-plus-bottom",
+      "ph-skip-forward",
+      "ph-trash",
+      "ph-scales",
+      "ph-timer",
+      "ph-bell",
+      "ph-export"
+    ]
+  },
+
+  "units": {
+    "canonical": "kg",
+    "display": ["kg", "lb"],
+    "rule": "Persistencia y motor SIEMPRE en kg. La conversión a lb ocurre solo al renderizar (factor 2.2046, redondeo a 0.5 lb)."
+  }
+}

@@ -1,0 +1,19 @@
+# Normaliza saltos de línea: LF en el repo, lo que toque en cada disco.
+# Sin esto, un equipo en Windows y otro en Mac se pisan el archivo entero.
+* text=auto eol=lf
+
+# Los .bat y .ps1 necesitan CRLF en Windows
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# Binarios: nunca tocar
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.ico binary
+
+# El contrato del motor: generado, no se revisa a mano en los diffs
+packages/engine/golden/cases.json linguist-generated=true

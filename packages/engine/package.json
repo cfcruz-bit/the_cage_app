@@ -1,0 +1,33 @@
+{
+  "name": "@cage/engine",
+  "version": "0.1.0",
+  "description": "Motor de autorregulacion de The Cage 2.0: progresion por RIR, ajuste de hard sets por feedback y planificacion set a set.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "golden",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "golden": "tsx scripts/generate-golden.ts"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.0"
+  }
+}
