@@ -5,9 +5,9 @@
  * si cambia, cambia la app y cambia el backend. Lo demás es interno.
  */
 
-export * from './types.js';
-export * from './policy.js';
-export * from './math.js';
-export * from './autoregulation.js';
-export * from './projection.js';
-export * from './fixtures.js';
+export * from './types';
+export * from './policy';
+export * from './math';
+export * from './autoregulation';
+export * from './projection';
+export * from './fixtures';

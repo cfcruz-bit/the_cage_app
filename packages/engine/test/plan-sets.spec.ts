@@ -11,7 +11,7 @@ import {
   fixture,
   planExercise,
   planSets,
-} from '../src/index.js';
+} from '../src/index';
 
 function lab(overrides: Partial<Exercise> = {}): Exercise {
   return {

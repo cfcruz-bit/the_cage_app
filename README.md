@@ -9,9 +9,12 @@ Ubicación: `C:\Users\cruzm\source\the-cage` — **fuera de OneDrive**, a propó
 
 ```
 packages/engine/   Motor de autorregulación (TypeScript, puro, testeado)  ✅ Fase 0
-apps/mobile/       App Expo / React Native                                ⬜ Fase 1
+apps/mobile/       App Expo / React Native, todo local                    ✅ Fase 1
 services/api/      Backend FastAPI + PostgreSQL                           ⬜ Fase 2
 ```
+
+Es un monorepo con workspaces de npm: **un solo `npm install` en la raíz**
+instala el motor y la app.
 
 ## Cómo ejecutarlo tú, en Windows
 
@@ -35,6 +38,16 @@ Remove-Item -Recurse -Force node_modules
 npm install
 ```
 
+**La app en tu teléfono:**
+
+```powershell
+cd "C:\Users\cruzm\source\the-cage"
+npm run mobile
+```
+
+Escanea el QR con **Expo Go**. Todo funciona en modo avión: lo que registres se
+guarda en SQLite dentro del teléfono.
+
 **A partir de ahí**, el día a día:
 
 ```powershell
@@ -51,8 +64,8 @@ integrada con `Ctrl+ñ`. Todo lo de arriba funciona igual ahí.
 
 | Fase | Qué | Estado |
 |---|---|---|
-| 0 | Rescatar el motor del prototipo HTML | **Hecha** — 1 805 tests verdes |
-| 1 | App Expo con SQLite local, sin backend | Siguiente |
+| 0 | Rescatar el motor del prototipo HTML | **Hecha** — 1 805 tests verdes, 0 discrepancias contra el prototipo |
+| 1 | App Expo con SQLite local, sin backend | **Hecha** — falta probarla en un teléfono |
 | 2 | Backend FastAPI, motor portado a Python | Pendiente |
 | 3 | Sincronización offline-first, coach, alertas, CI | Pendiente |
 

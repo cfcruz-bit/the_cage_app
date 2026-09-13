@@ -10,9 +10,9 @@
  * el deload.
  */
 
-import { Exercise, ExercisePlan } from './types.js';
-import { clamp, roundTo } from './math.js';
-import { MIN_HARD_SETS } from './policy.js';
+import { Exercise, ExercisePlan } from './types';
+import { clamp, roundTo } from './math';
+import { MIN_HARD_SETS } from './policy';
 
 /** Porcentaje de la carga que se mantiene en la semana de deload. */
 export const DELOAD_LOAD_FACTOR = 0.75;

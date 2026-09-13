@@ -1,0 +1,19 @@
+{
+  "name": "the-cage",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test -w @cage/engine",
+    "typecheck": "npm run typecheck -w @cage/engine && npm run typecheck -w @cage/mobile",
+    "golden": "npm run golden -w @cage/engine",
+    "mobile": "npm run start -w @cage/mobile",
+    "doctor": "npm run doctor -w @cage/mobile"
+  },
+  "overrides": {
+    "react": "19.2.3"
+  }
+}

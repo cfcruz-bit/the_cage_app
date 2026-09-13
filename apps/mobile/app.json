@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "The Cage",
+    "slug": "the-cage",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "thecage",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0a0a",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.thecage.app"
+    },
+    "android": {
+      "package": "com.thecage.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#0a0a0a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "icon": "./assets/icon.png"
+  }
+}

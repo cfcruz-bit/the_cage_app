@@ -23,7 +23,7 @@ import {
   SetPlan,
   Soreness,
   WorkloadFeel,
-} from './types.js';
+} from './types';
 import {
   AGGRESSIVENESS_FACTOR,
   AT_LIMIT_MAX_STEPS,
@@ -32,8 +32,8 @@ import {
   POLICY_VERSION,
   REASONS,
   REASON_SEPARATOR,
-} from './policy.js';
-import { clamp, e1rm, roundHalfUp, roundTo } from './math.js';
+} from './policy';
+import { clamp, e1rm, roundHalfUp, roundTo } from './math';
 
 /**
  * Decide la carga y el número de hard sets de un ejercicio para esta semana.

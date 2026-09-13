@@ -16,7 +16,7 @@ import {
   Pump,
   Soreness,
   WorkloadFeel,
-} from './types.js';
+} from './types';
 
 export const DEFAULT_FEEDBACK: Feedback = {
   joint: JointPain.None,

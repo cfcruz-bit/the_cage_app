@@ -8,7 +8,7 @@
  * golden/cases.json cubren exactamente esta diferencia.
  */
 
-import { EPLEY_DIVISOR } from './policy.js';
+import { EPLEY_DIVISOR } from './policy';
 
 /** Acota v al intervalo [min, max]. */
 export function clamp(v: number, min: number, max: number): number {

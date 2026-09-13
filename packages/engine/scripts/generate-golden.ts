@@ -33,7 +33,7 @@ import {
   planExercise,
   planSets,
   projectMesocycle,
-} from '../src/index.js';
+} from '../src/index';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, '..', 'golden', 'cases.json');

@@ -8,7 +8,7 @@
  * con qué reglas se produjo.
  */
 
-import { Aggressiveness } from './types.js';
+import { Aggressiveness } from './types';
 
 /**
  * Versión de las reglas. Formato AAAA.MM.

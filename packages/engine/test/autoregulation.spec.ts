@@ -11,7 +11,7 @@ import {
   WorkloadFeel,
   fixture,
   planExercise,
-} from '../src/index.js';
+} from '../src/index';
 
 /** Ejercicio de laboratorio: números redondos para que cada aserción sea legible. */
 function lab(overrides: Partial<Exercise> = {}): Exercise {

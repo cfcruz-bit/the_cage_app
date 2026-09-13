@@ -8,7 +8,7 @@ import {
   planExercise,
   planSets,
   projectMesocycle,
-} from '../src/index.js';
+} from '../src/index';
 
 /**
  * Test de regresión sobre golden/cases.json.
