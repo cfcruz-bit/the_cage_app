@@ -1,0 +1,40 @@
+[project]
+name = "cage-api"
+version = "0.1.0"
+description = "Backend de The Cage 2.0: motor de autorregulacion, planes y sincronizacion"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.141,<0.142",
+    "uvicorn[standard]>=0.52,<0.53",
+    "pydantic>=2.13,<3",
+    "pydantic-settings>=2.15,<3",
+    # Persistencia. Llegan en el siguiente bloque de la Fase 2.
+    "sqlalchemy>=2.0.52,<2.1",
+    "alembic>=1.20,<1.21",
+    "asyncpg>=0.31,<0.32",
+    # Seguridad. Argon2id para contrasenas, JWT para sesiones.
+    "argon2-cffi>=25.1,<26",
+    "pyjwt>=2.14,<3",
+    "slowapi>=0.1.10,<0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1,<10",
+    "pytest-asyncio>=1.4,<2",
+    "httpx>=0.28,<0.29",
+    "ruff>=0.16,<0.17",
+    "aiosqlite>=0.20,<0.22",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 96
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
