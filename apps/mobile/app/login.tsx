@@ -6,11 +6,12 @@
  * escalonados. Al elegir rol, el rojo tapa la pantalla y la navegación ocurre
  * detrás, a los 300 ms, para que no se vea el cambio.
  *
- * En la Fase 2 esta pantalla pasa a ser el login real y el rol vendrá de
- * `GET /me`, pero la coreografía se mantiene.
+ * Desde la Fase 3 la elección de rol abre un formulario de credenciales: el rol
+ * lo confirma el servidor, no la tarjeta que se toque. La coreografía se
+ * mantiene intacta, y el corte rojo solo entra cuando el login ha ido bien.
  */
 
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -25,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NAVIGATE_AT_MS } from '@/features/login/EnteringOverlay';
+import { CredentialsSheet } from '@/features/login/CredentialsSheet';
 import { Role, ROLE_LABEL, useApp } from '@/stores/app';
 import { color, palette, space } from '@/theme/tokens';
 
@@ -66,12 +68,27 @@ export default function LoginScreen() {
   const entering = useApp((s) => s.entering);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Rol cuya tarjeta se tocó y está esperando credenciales. */
+  const [pending, setPending] = useState<Role | null>(null);
+
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
   function pick(role: Role) {
     if (entering) return;
+    setPending(role);
+  }
+
+  /**
+   * El servidor ya confirmó quién es y que su rol coincide.
+   *
+   * Solo AQUÍ arranca el corte rojo. Antes se lanzaba al tocar la tarjeta, y
+   * habría tapado la pantalla para luego tener que destaparla ante un error de
+   * contraseña.
+   */
+  function onAuthenticated(role: Role) {
+    setPending(null);
     enter(role);
     // El rojo ya está tapando; la app cambia de pantalla debajo, sin que se vea.
     timer.current = setTimeout(() => router.replace('/'), NAVIGATE_AT_MS);
@@ -131,6 +148,12 @@ export default function LoginScreen() {
           </Text>
         </Reveal>
       </View>
+
+      <CredentialsSheet
+        role={pending}
+        onCancel={() => setPending(null)}
+        onSuccess={onAuthenticated}
+      />
     </SafeAreaView>
   );
 }

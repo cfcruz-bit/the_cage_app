@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "cage-api"
 version = "0.1.0"
@@ -7,7 +11,9 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.141,<0.142",
     "uvicorn[standard]>=0.52,<0.53",
-    "pydantic>=2.13,<3",
+    # [email] trae email-validator, que EmailStr necesita en tiempo de
+    # ejecucion: sin el, importar los DTO revienta.
+    "pydantic[email]>=2.13,<3",
     "pydantic-settings>=2.15,<3",
     # Persistencia. Llegan en el siguiente bloque de la Fase 2.
     "sqlalchemy>=2.0.52,<2.1",
@@ -28,9 +34,16 @@ dev = [
     "aiosqlite>=0.20,<0.22",
 ]
 
+# Sin esto setuptools intenta empaquetar tambien `migrations/` y aborta con
+# "Multiple top-level packages discovered in a flat-layout". El paquete
+# distribuible es solo `app`; migrations y tests son herramientas del repo.
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 96
@@ -38,3 +51,8 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+# Las revisiones las escribe Alembic, no nosotros: reformatearlas a mano las
+# aleja de lo que regenera `--autogenerate` y hace ilegible el diff.
+[tool.ruff.lint.per-file-ignores]
+"migrations/versions/*.py" = ["E501"]

@@ -130,6 +130,22 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       PRAGMA user_version = 2;
     `);
   }
+
+  if (current < 3) {
+    // Backoff de la cola de sincronizacion. `next_attempt_at` es cuando toca
+    // volver a intentarlo; mientras sea futuro, el worker se la salta.
+    // `last_error` no lo lee nadie: existe para poder investigar por que una
+    // entrada lleva seis intentos sin subir.
+    await database.execAsync(`
+      ALTER TABLE sync_queue ADD COLUMN next_attempt_at TEXT;
+      ALTER TABLE sync_queue ADD COLUMN last_error TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_next
+        ON sync_queue (next_attempt_at);
+
+      PRAGMA user_version = 3;
+    `);
+  }
 }
 
 /* ── Ajustes ──────────────────────────────────────────────────────────────── */

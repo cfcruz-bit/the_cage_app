@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Cage · Administración</title>
+<style>
+  /* Los mismos tokens que la app. Si cambian allí, cambian aquí. */
+  :root {
+    --bg: #0a0a0a; --raised: #131313; --border: #2e2e2b;
+    --text: #edeae1; --muted: #8d8a80; --faint: #6b6862;
+    --accent: #e04a3a; --accent-edge: #c2231b; --warn: #ded6c4;
+    --ok: #4c4a45;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px 16px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 20px; letter-spacing: 3px; margin: 0 0 4px; }
+  .sub { color: var(--faint); font-size: 12px; letter-spacing: 2px; margin-bottom: 28px; }
+  h2 { font-size: 13px; letter-spacing: 2px; color: var(--muted); margin: 32px 0 10px; font-weight: 600; }
+
+  .card { background: var(--raised); border: 1px solid var(--border); padding: 18px; margin-bottom: 14px; }
+  label { display: block; font-size: 11px; letter-spacing: 1.4px; color: var(--muted); margin-bottom: 5px; }
+  input, select {
+    width: 100%; padding: 11px 12px; background: #1b1b1a; color: var(--text);
+    border: 1px solid var(--border); font-size: 15px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 180px; }
+  .field { margin-bottom: 12px; }
+
+  button {
+    background: var(--accent); color: #f7f4ec; border: 0; padding: 11px 18px;
+    font: 600 13px/1 inherit; letter-spacing: 2px; cursor: pointer;
+  }
+  button:hover { background: var(--accent-edge); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); letter-spacing: 0; font-weight: 500; padding: 7px 12px; }
+  button.ghost:hover { border-color: var(--accent); color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 10px; letter-spacing: 1.6px; color: var(--muted); padding: 0 10px 8px; font-weight: 600; }
+  td { padding: 11px 10px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:hover { background: #161616; }
+  .muted { color: var(--muted); font-size: 12.5px; }
+
+  .tag { font-size: 10.5px; letter-spacing: 1.2px; padding: 3px 8px; border: 1px solid var(--border); white-space: nowrap; }
+  .tag.activo { color: var(--muted); }
+  .tag.porvencer { color: #0a0a0a; background: var(--warn); border-color: var(--warn); }
+  .tag.vencido, .tag.sinacceso { color: #f7f4ec; background: var(--accent-edge); border-color: var(--accent-edge); }
+  .tag.nocaduca { color: var(--faint); }
+  .tag.inactivo { color: var(--faint); border-style: dashed; }
+
+  .banner { padding: 12px 14px; border: 1px solid var(--border); margin-bottom: 14px; font-size: 13.5px; }
+  .banner.bad { border-color: var(--accent); color: var(--accent); }
+  .banner.good { border-color: var(--ok); }
+  .pw { font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: 18px; letter-spacing: 2px; color: var(--text); }
+  .hide { display: none; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  @media (max-width: 720px) {
+    .hide-sm { display: none; }
+    td, th { padding-left: 6px; padding-right: 6px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>THE CAGE</h1>
+  <div class="sub">ADMINISTRACIÓN</div>
+
+  <!-- ── Entrar ─────────────────────────────────────────────────────────── -->
+  <section id="login" class="card">
+    <h2 style="margin-top:0">Entrar</h2>
+    <div id="loginError" class="banner bad hide"></div>
+    <div class="field"><label>Email</label><input id="email" type="email" autocomplete="username"></div>
+    <div class="field"><label>Contraseña</label><input id="password" type="password" autocomplete="current-password"></div>
+    <button id="loginBtn">ENTRAR</button>
+  </section>
+
+  <!-- ── Panel ──────────────────────────────────────────────────────────── -->
+  <section id="panel" class="hide">
+    <div id="notice" class="banner hide"></div>
+
+    <div id="credential" class="card hide">
+      <h2 style="margin-top:0">Contraseña provisional</h2>
+      <p class="muted" style="margin:0 0 10px">
+        Pásasela al usuario. <strong>No se puede volver a ver</strong>: en cuanto
+        cierres esto, solo queda su hash. La app le obligará a cambiarla al entrar.
+      </p>
+      <div class="pw" id="tempPassword"></div>
+      <p class="muted" id="tempFor" style="margin:8px 0 12px"></p>
+      <button class="ghost" onclick="hideCredential()">Ya la copié</button>
+    </div>
+
+    <h2>Nuevo atleta</h2>
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>Nombre</label><input id="aName"></div>
+        <div class="field"><label>Email</label><input id="aEmail" type="email"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Entrenador</label><select id="aCoach"></select></div>
+        <div class="field"><label>Meses pagados</label><input id="aMonths" type="number" value="1" min="1" max="24"></div>
+        <div class="field"><label>Nota (opcional)</label><input id="aNote" placeholder="efectivo, transferencia…"></div>
+      </div>
+      <button id="createAthlete">CREAR ATLETA</button>
+    </div>
+
+    <h2>Nuevo entrenador</h2>
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>Nombre</label><input id="cName"></div>
+        <div class="field"><label>Email</label><input id="cEmail" type="email"></div>
+      </div>
+      <p class="muted" style="margin:0 0 12px">El acceso de un entrenador no caduca.</p>
+      <button id="createCoach">CREAR ENTRENADOR</button>
+    </div>
+
+    <h2>Personas</h2>
+    <div class="card" style="padding:14px 8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th class="hide-sm">Entrenador</th>
+            <th>Estado</th>
+            <th class="hide-sm">Vence</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <p class="muted" style="margin-top:24px">
+      <button class="ghost" onclick="logout()">Cerrar sesión</button>
+    </p>
+  </section>
+</main>
+
+<script>
+/**
+ * Panel de administración de The Cage.
+ *
+ * Una sola página, sin dependencias. El token vive en memoria y NO en
+ * localStorage: en la computadora del gimnasio pasa gente, y un token que
+ * sobrevive a cerrar la pestaña es un token que alguien más puede usar.
+ * El precio es volver a entrar al recargar, y para lo que se usa esto —dos o
+ * tres altas al día— es un precio justo.
+ */
+const API = '/api/v1';
+let token = null;
+let coaches = [];
+
+const $ = (id) => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const res = await fetch(API + path, {
+    method: options.method || 'GET',
+    headers: {
+      'Accept': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    // `detail` es una cadena en nuestros errores y un array en los de
+    // validación de Pydantic. Los dos casos son reales.
+    const d = data && data.detail;
+    const msg = typeof d === 'string' ? d
+      : Array.isArray(d) && d[0] && d[0].msg ? d[0].msg
+      : 'Error ' + res.status;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+function notice(text, ok) {
+  const el = $('notice');
+  el.textContent = text;
+  el.className = 'banner ' + (ok ? 'good' : 'bad');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showCredential(created) {
+  $('tempPassword').textContent = created.temporaryPassword;
+  $('tempFor').textContent = created.user.displayName + ' · ' + created.user.email;
+  $('credential').classList.remove('hide');
+  $('credential').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideCredential() {
+  $('credential').classList.add('hide');
+  $('tempPassword').textContent = '';
+}
+
+// ── Entrar ──────────────────────────────────────────────────────────────────
+
+$('loginBtn').onclick = async () => {
+  const err = $('loginError');
+  err.classList.add('hide');
+  $('loginBtn').disabled = true;
+  try {
+    const pair = await api('/auth/login', {
+      method: 'POST',
+      body: { email: $('email').value.trim().toLowerCase(), password: $('password').value },
+    });
+    token = pair.accessToken;
+
+    const me = await api('/auth/me');
+    if (me.role !== 'admin') {
+      token = null;
+      throw new Error('Esa cuenta no es de administrador.');
+    }
+
+    $('password').value = '';
+    $('login').classList.add('hide');
+    $('panel').classList.remove('hide');
+    await refresh();
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove('hide');
+  } finally {
+    $('loginBtn').disabled = false;
+  }
+};
+
+$('password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('loginBtn').click();
+});
+
+function logout() {
+  token = null;
+  location.reload();
+}
+
+// ── Tabla ───────────────────────────────────────────────────────────────────
+
+async function refresh() {
+  const users = await api('/admin/users');
+
+  coaches = users.filter((u) => u.role === 'coach' && u.isActive);
+  $('aCoach').innerHTML = coaches.length
+    ? coaches.map((c) => `<option value="${c.id}">${escapeHtml(c.displayName)}</option>`).join('')
+    : '<option value="">— crea un entrenador primero —</option>';
+
+  $('rows').innerHTML = users.map(rowHtml).join('');
+}
+
+function rowHtml(u) {
+  const cls = u.status.replace(/\s/g, '');
+  const tag = !u.isActive
+    ? '<span class="tag inactivo">desactivado</span>'
+    : `<span class="tag ${cls}">${u.status}</span>`;
+
+  const vence = u.accessEndsOn
+    ? `${u.accessEndsOn}${u.daysLeft != null ? ` <span class="muted">(${u.daysLeft} d)</span>` : ''}`
+    : '<span class="muted">—</span>';
+
+  const acciones = [];
+  if (u.role === 'athlete') {
+    acciones.push(`<button class="ghost" onclick="renew('${u.id}','${escapeAttr(u.displayName)}')">Renovar</button>`);
+  }
+  if (u.role !== 'admin') {
+    acciones.push(`<button class="ghost" onclick="resetPassword('${u.id}')">Contraseña</button>`);
+    acciones.push(`<button class="ghost" onclick="setActive('${u.id}',${!u.isActive})">${u.isActive ? 'Desactivar' : 'Reactivar'}</button>`);
+  }
+
+  const pendiente = u.mustChangePassword
+    ? ' <span class="muted">· contraseña sin cambiar</span>'
+    : '';
+
+  return `<tr>
+    <td>${escapeHtml(u.displayName)}<div class="muted">${escapeHtml(u.email)} · ${u.role}${pendiente}</div></td>
+    <td class="hide-sm muted">${u.coachName ? escapeHtml(u.coachName) : '—'}</td>
+    <td>${tag}</td>
+    <td class="hide-sm">${vence}</td>
+    <td><div class="actions">${acciones.join('')}</div></td>
+  </tr>`;
+}
+
+// ── Acciones ────────────────────────────────────────────────────────────────
+
+$('createAthlete').onclick = async () => {
+  const coachId = $('aCoach').value;
+  if (!coachId) return notice('Crea primero un entrenador al que asignarlo.', false);
+
+  try {
+    const created = await api('/admin/athletes', {
+      method: 'POST',
+      body: {
+        email: $('aEmail').value.trim().toLowerCase(),
+        displayName: $('aName').value.trim(),
+        coachId,
+        months: Number($('aMonths').value) || 1,
+        note: $('aNote').value.trim(),
+      },
+    });
+    $('aName').value = $('aEmail').value = $('aNote').value = '';
+    showCredential(created);
+    notice(`${created.user.displayName} tiene acceso hasta el ${created.user.accessEndsOn}.`, true);
+    await refresh();
+  } catch (e) { notice(e.message, false); }
+};
+
+$('createCoach').onclick = async () => {
+  try {
+    const created = await api('/admin/coaches', {
+      method: 'POST',
+      body: {
+        email: $('cEmail').value.trim().toLowerCase(),
+        displayName: $('cName').value.trim(),
+      },
+    });
+    $('cName').value = $('cEmail').value = '';
+    showCredential(created);
+    notice('Entrenador creado.', true);
+    await refresh();
+  } catch (e) { notice(e.message, false); }
+};
+
+async function renew(id, name) {
+  const months = prompt(`¿Cuántos meses paga ${name}?`, '1');
+  if (months === null) return;
+  const note = prompt('Nota (opcional): efectivo, transferencia…', '') ?? '';
+  try {
+    const user = await api(`/admin/athletes/${id}/renew`, {
+      method: 'POST',
+      body: { months: Number(months) || 1, note },
+    });
+    notice(`${name} tiene acceso hasta el ${user.accessEndsOn}.`, true);
+    await refresh();
+  } catch (e) { notice(e.message, false); }
+}
+
+async function resetPassword(id) {
+  if (!confirm('Se genera una contraseña nueva y la anterior deja de servir. ¿Seguir?')) return;
+  try {
+    showCredential(await api(`/admin/users/${id}/password`, { method: 'POST' }));
+    await refresh();
+  } catch (e) { notice(e.message, false); }
+}
+
+async function setActive(id, active) {
+  if (!active && !confirm('No podrá entrar hasta que lo reactives. Su historial se conserva. ¿Seguir?')) return;
+  try {
+    await api(`/admin/users/${id}/active?active=${active}`, { method: 'POST' });
+    await refresh();
+  } catch (e) { notice(e.message, false); }
+}
+
+// Los nombres los escribe el admin, pero escaparlos igual es gratis y evita
+// que un apellido con comillas rompa la tabla.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+function escapeAttr(s) { return escapeHtml(s).replace(/`/g, ''); }
+</script>
+</body>
+</html>

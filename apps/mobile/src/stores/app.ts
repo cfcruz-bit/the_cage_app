@@ -1,9 +1,9 @@
 /**
  * Estado de aplicación: quién entró y en qué rol.
  *
- * Separado del store de sesión y del de UI. En la Fase 2 el rol deja de
- * elegirse aquí y pasa a venir de `GET /me`, pero la forma del store no
- * cambia: solo cambia quién lo rellena.
+ * Separado del store de sesión y del de UI. Desde la Fase 3 el rol NO se elige
+ * aquí: lo rellena `adopt()` con lo que dice la cuenta autenticada. Este store
+ * solo guarda qué pinta la interfaz.
  */
 
 import { create } from 'zustand';
@@ -17,6 +17,8 @@ interface AppState {
   entering: string | null;
 
   enter: (role: Role) => void;
+  /** Adopta el rol de la cuenta autenticada. null = no hay sesión. */
+  adopt: (role: Role | null) => void;
   logout: () => void;
   clearEntering: () => void;
 }
@@ -31,6 +33,7 @@ export const useApp = create<AppState>((set) => ({
   entering: null,
 
   enter: (role) => set({ entering: ROLE_LABEL[role].toUpperCase(), role }),
+  adopt: (role) => set({ role }),
   clearEntering: () => set({ entering: null }),
   logout: () => set({ role: null, entering: null }),
 }));
