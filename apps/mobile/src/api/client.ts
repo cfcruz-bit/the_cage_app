@@ -23,19 +23,53 @@ import Constants from 'expo-constants';
 import { clearTokens, getTokens, saveTokens } from '@/api/session';
 import type { TokenPair } from '@/api/types';
 
+/** Puerto donde escucha uvicorn. */
+const API_PORT = 8000;
+
 /**
- * URL del servidor.
+ * Dónde está el servidor, averiguado solo.
  *
- * Se lee de `extra.apiUrl` en `app.json` y no de una variable de entorno a
- * propósito: `process.env` necesita tipos de Node que esta app no instala, y
- * `expo-constants` ya es una dependencia.
+ * En desarrollo NO hace falta configurar nada. El razonamiento: el teléfono
+ * acaba de descargar este código de Metro, que corre en tu PC, así que ya sabe
+ * la IP de tu PC — está en `hostUri`, con la forma "192.168.0.15:8081". Se le
+ * cambia el puerto por el de la API y listo.
  *
- * En desarrollo tiene que ser la IP de tu PC en la red local. `localhost`
- * NO vale desde el teléfono: ahí localhost es el propio teléfono.
+ * Eso elimina el paso de buscar la IPv4 del adaptador Wi-Fi a mano, que además
+ * hay que repetir cada vez que el router reparte una dirección distinta.
+ *
+ * `extra.apiUrl` en `app.json` sigue mandando cuando tiene valor: es lo que se
+ * usa en producción, donde no hay Metro del que deducir nada. Vacío = automático.
  */
-export const API_URL =
-  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
-  'http://localhost:8000';
+function resolveApiUrl(): string {
+  const configured = Constants.expoConfig?.extra?.apiUrl;
+  if (typeof configured === 'string' && configured.trim().length > 0) {
+    return configured.trim().replace(/\/+$/, '');
+  }
+
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    // En algunos modos de arranque hostUri no está, pero sí la URL del bundle.
+    (Constants.linkingUri as string | undefined);
+
+  const host = hostUri?.split('://').pop()?.split('/')[0]?.split(':')[0];
+
+  if (host !== undefined && host.length > 0) {
+    return `http://${host}:${API_PORT}`;
+  }
+
+  // Último recurso. Solo sirve en el emulador o en web, donde el teléfono y el
+  // servidor son la misma máquina.
+  return `http://localhost:${API_PORT}`;
+}
+
+export const API_URL = resolveApiUrl();
+
+// Se imprime en la terminal de Metro al arrancar. Es la forma más rápida de
+// distinguir "el servidor no responde" de "la app está mirando a la dirección
+// equivocada", que producen el mismo mensaje en pantalla y se arreglan distinto.
+if (__DEV__) {
+  console.log(`[cage] API en ${API_URL}`);
+}
 
 const PREFIX = '/api/v1';
 

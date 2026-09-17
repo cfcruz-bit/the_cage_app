@@ -13,6 +13,7 @@
 
 import type {
   Aggressiveness,
+  Exercise,
   Feedback,
   MuscleGroup,
 } from '@cage/engine';
@@ -53,8 +54,20 @@ export interface ExerciseCatalogOut {
   loadIncrementKg: number;
 }
 
+export interface PrescriptionIn {
+  /** null = para todo el bloque. N = solo para esa semana. */
+  weekNumber: number | null;
+  sets: number | null;
+  loadKg: number | null;
+  repLo: number | null;
+  repHi: number | null;
+  targetRir: number | null;
+  restSeconds: number;
+}
+
 export interface PrescriptionOut {
   mesocycleExerciseId: string;
+  weekNumber: number | null;
   sets: number | null;
   loadKg: number | null;
   repLo: number | null;
@@ -73,7 +86,47 @@ export interface MesocycleExerciseOut {
   repHi: number;
   targetRir: number;
   loadIncrementKg: number;
+  /** Punto de partida de la semana 1. Con esto la app proyecta el mesociclo. */
+  startingLoadKg: number;
+  startingReps: number;
+  startingSets: number;
   prescription: PrescriptionOut | null;
+}
+
+export type TrainingGoal = 'fuerza' | 'hipertrofia' | 'hibrido';
+
+export interface MesocycleSummaryOut {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  name: string;
+  totalWeeks: number;
+  currentWeekIndex: number;
+  aggressiveness: Aggressiveness;
+  goal: TrainingGoal;
+  status: 'draft' | 'active' | 'completed' | 'archived';
+  exerciseCount: number;
+}
+
+/** Lo que el coach manda al crear un mesociclo. */
+export interface MesocycleExerciseIn {
+  catalogId: string;
+  repLo: number;
+  repHi: number;
+  targetRir: number;
+  loadIncrementKg: number;
+  startingLoadKg: number;
+  startingReps: number;
+  startingSets: number;
+}
+
+export interface MesocycleIn {
+  athleteId: string;
+  name: string;
+  totalWeeks: number;
+  aggressiveness: Aggressiveness;
+  goal: TrainingGoal;
+  exercises: MesocycleExerciseIn[];
 }
 
 export interface MesocycleOut {
@@ -84,6 +137,7 @@ export interface MesocycleOut {
   totalWeeks: number;
   currentWeekIndex: number;
   aggressiveness: Aggressiveness;
+  goal: TrainingGoal;
   status: 'draft' | 'active' | 'completed' | 'archived';
   exercises: MesocycleExerciseOut[];
 }
@@ -110,6 +164,15 @@ export interface SessionExerciseOut {
   policyVersion: string;
   why: string;
   sets: PlannedSetOut[];
+  /**
+   * El ejercicio tal como lo entiende el motor, con lo que hizo la vez
+   * anterior.
+   *
+   * Viaja para que la app pueda enseñar el EFECTO del feedback antes de
+   * enviarlo, al instante y sin cobertura. Lo que se persiste sale del
+   * servidor igual que siempre.
+   */
+  exercise: Exercise;
 }
 
 export interface SessionOut {
@@ -207,4 +270,46 @@ export interface CoachOverviewOut {
   athletes: number;
   sessionsLast7Days: number;
   openAlerts: number;
+}
+
+
+// ── La rejilla del plan ─────────────────────────────────────────────────────
+
+/**
+ * Lo que hará un ejercicio en una semana.
+ *
+ * Los `*Overridden` son lo que hace útil la pantalla: sin ellos el coach no
+ * puede distinguir un número que puso él de uno que calculó el motor, y no
+ * sabría qué está a punto de pisar.
+ */
+export interface PlanCellOut {
+  weekNumber: number;
+  isDeload: boolean;
+  sets: number;
+  loadKg: number;
+  repLo: number;
+  repHi: number;
+  targetRir: number;
+  restSeconds: number;
+  setsOverridden: boolean;
+  loadOverridden: boolean;
+  repsOverridden: boolean;
+  rirOverridden: boolean;
+}
+
+export interface PlanRowOut {
+  mesocycleExerciseId: string;
+  name: string;
+  muscle: string;
+  equipment: string;
+  weeks: PlanCellOut[];
+}
+
+export interface PlanGridOut {
+  mesocycleId: string;
+  name: string;
+  goal: TrainingGoal;
+  totalWeeks: number;
+  currentWeekIndex: number;
+  rows: PlanRowOut[];
 }

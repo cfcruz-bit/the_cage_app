@@ -42,6 +42,21 @@ config.set_main_option("sqlalchemy.url", DATABASE_URL)
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 
+#: Indices que Alembic no sabe reflejar en SQLite.
+#:
+#: Los indices PARCIALES (con WHERE) se reflejan sin su condicion, asi que al
+#: comparar contra el modelo parecen distintos y `alembic check` propone
+#: borrarlos en bucle. En Postgres si se reflejan bien.
+#:
+#: Se excluyen por nombre y solo en SQLite: cualquier otra diferencia sigue
+#: detectandose, que es lo que hace util a `alembic check`.
+SQLITE_UNREFLECTABLE_INDEXES = frozenset({"uq_prescriptions_base"})
+
+
+def include_object(obj, name, type_, reflected, compare_to):  # noqa: ANN001, ANN201
+    return not (IS_SQLITE and type_ == "index" and name in SQLITE_UNREFLECTABLE_INDEXES)
+
+
 def run_migrations_offline() -> None:
     """Genera el SQL sin conectarse. Util para revisarlo antes de aplicarlo."""
     context.configure(
@@ -52,6 +67,7 @@ def run_migrations_offline() -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=IS_SQLITE,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -64,6 +80,7 @@ def do_run_migrations(connection) -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=IS_SQLITE,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

@@ -283,3 +283,69 @@ async def test_la_semana_fuera_del_bloque_se_rechaza(
         json={"weekNumber": 9, "dayLabel": "Push A"},
     )
     assert r.status_code == 400
+
+
+# ── La sesión en curso ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_sin_sesion_abierta_devuelve_null(client: AsyncClient, entorno: dict) -> None:
+    """ "Hoy no te toca" es una respuesta normal, no un error."""
+    r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
+    assert r.status_code == 200
+    assert r.json() is None
+
+
+@pytest.mark.asyncio
+async def test_el_atleta_encuentra_su_sesion_abierta(
+    client: AsyncClient, entorno: dict
+) -> None:
+    creada = await _nueva_sesion(client, entorno)
+
+    r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
+    assert r.status_code == 200
+    assert r.json()["id"] == creada["id"]
+
+
+@pytest.mark.asyncio
+async def test_una_sesion_cerrada_ya_no_es_la_actual(
+    client: AsyncClient, entorno: dict
+) -> None:
+    """Una sesión cerrada no se entrena; se consulta desde el historial."""
+    creada = await _nueva_sesion(client, entorno)
+    await client.post(f"/api/v1/sessions/{creada['id']}/complete", headers=entorno["aa"])
+
+    r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
+    assert r.json() is None
+
+
+@pytest.mark.asyncio
+async def test_el_coach_puede_mirar_la_de_su_atleta(client: AsyncClient, entorno: dict) -> None:
+    creada = await _nueva_sesion(client, entorno)
+    meso = await client.get(
+        f"/api/v1/mesocycles/{entorno['meso']['id']}", headers=entorno["ca"]
+    )
+    athlete_id = meso.json()["athleteId"]
+
+    r = await client.get(
+        f"/api/v1/sessions/current?athleteId={athlete_id}", headers=entorno["ca"]
+    )
+    assert r.status_code == 200
+    assert r.json()["id"] == creada["id"]
+
+
+@pytest.mark.asyncio
+async def test_un_coach_ajeno_no_mira_la_sesion(
+    client: AsyncClient, admin: dict, entorno: dict
+) -> None:
+    await _nueva_sesion(client, entorno)
+    meso = await client.get(
+        f"/api/v1/mesocycles/{entorno['meso']['id']}", headers=entorno["ca"]
+    )
+    athlete_id = meso.json()["athleteId"]
+
+    otro_mail, _ = await register(client, admin, "coach")
+    otro = auth(await login(client, otro_mail))
+
+    r = await client.get(f"/api/v1/sessions/current?athleteId={athlete_id}", headers=otro)
+    assert r.status_code == 404

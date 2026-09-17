@@ -262,3 +262,84 @@ async def test_un_coach_no_se_anade_a_si_mismo(client: AsyncClient, mundo: Escen
     )
     # Es un coach, no un atleta: ni siquiera llega a la comprobacion de igualdad.
     assert r.status_code == 404
+
+
+# ── Listado de mesociclos ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_el_coach_lista_los_mesociclos_de_su_cartera(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    r = await client.get("/api/v1/mesocycles", headers=mundo.ca)
+    assert r.status_code == 200
+
+    lista = r.json()
+    assert len(lista) == 1
+    assert lista[0]["athleteName"] == "Test"
+    assert lista[0]["exerciseCount"] == 1
+
+
+@pytest.mark.asyncio
+async def test_un_coach_ajeno_recibe_una_lista_vacia(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    """Vacía y no 403: no hay nada que confirmarle."""
+    r = await client.get("/api/v1/mesocycles", headers=mundo.cb)
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_el_atleta_solo_ve_los_suyos(client: AsyncClient, mundo: Escenario) -> None:
+    propios = await client.get("/api/v1/mesocycles", headers=mundo.aa)
+    assert [m["id"] for m in propios.json()] == [mundo.meso["id"]]
+
+    ajenos = await client.get("/api/v1/mesocycles", headers=mundo.ab)
+    assert ajenos.json() == []
+
+
+@pytest.mark.asyncio
+async def test_el_filtro_por_atleta_no_deja_sondear(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    """Si el filtro se respetara para el atleta, comparando respuestas podría
+    averiguar qué otros atletas existen."""
+    r = await client.get(
+        f"/api/v1/mesocycles?athleteId={mundo.atleta_a['id']}", headers=mundo.ab
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_el_detalle_trae_las_cargas_de_arranque(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    """El móvil las necesita para proyectar el mesociclo con el mismo motor."""
+    r = await client.get(f"/api/v1/mesocycles/{mundo.meso['id']}", headers=mundo.ca)
+    ex = r.json()["exercises"][0]
+    assert ex["startingLoadKg"] == 60.0
+    assert ex["startingReps"] == 8
+    assert ex["startingSets"] == 3
+
+
+@pytest.mark.asyncio
+async def test_el_filtro_por_atleta_funciona_de_verdad(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    """El filtro tiene que FILTRAR, no ignorarse.
+
+    Sin alias en el parámetro de consulta, `athleteId` no se enlaza y la lista
+    vuelve entera. Se comprueba pidiendo un atleta que el coach lleva pero cuyo
+    mesociclo no es el único: si el filtro se ignorara, saldrían los dos.
+    """
+    con_filtro = await client.get(
+        f"/api/v1/mesocycles?athleteId={mundo.atleta_b['id']}", headers=mundo.ca
+    )
+    assert con_filtro.status_code == 200
+    # El coach A no lleva al atleta B: filtrando por él, nada.
+    assert con_filtro.json() == []
+
+    sin_filtro = await client.get("/api/v1/mesocycles", headers=mundo.ca)
+    assert len(sin_filtro.json()) == 1

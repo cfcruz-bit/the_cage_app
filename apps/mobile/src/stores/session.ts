@@ -32,7 +32,6 @@ import {
   writeSetting,
 } from '@/db';
 import { Prescription, emptyPrescription } from '@/lib/prescription';
-import { seedIfEmpty } from '@/db/seed';
 import type { Unit } from '@/lib/units';
 
 const EMPTY_ENTRY: SetLogEntry = { weightKg: null, reps: null, done: false };
@@ -78,7 +77,9 @@ export const useSession = create<SessionState>((set, get) => ({
   prescriptions: {},
 
   hydrate: async () => {
-    await seedIfEmpty();
+    // Sin siembra: la pantalla de entreno arranca vacia hasta que el coach
+    // genere una sesion. Lo que habia antes eran tres ejercicios de ejemplo
+    // del prototipo.
     const [exercises, logs, feedbackDone, prescriptions, unit, aggressiveness] =
       await Promise.all([
         readExercises(),

@@ -13,7 +13,11 @@ import type {
   CoachOverviewOut,
   ExerciseCatalogOut,
   FeedbackIn,
+  MesocycleIn,
   MesocycleOut,
+  MesocycleSummaryOut,
+  PlanGridOut,
+  PrescriptionIn,
   PrescriptionOut,
   Role,
   SessionOut,
@@ -100,17 +104,32 @@ export async function getMesocycle(id: string): Promise<MesocycleOut> {
   return request<MesocycleOut>(`/mesocycles/${id}`);
 }
 
+export async function listMesocycles(
+  athleteId?: string,
+): Promise<MesocycleSummaryOut[]> {
+  const query = athleteId === undefined ? '' : `?athleteId=${athleteId}`;
+  return request<MesocycleSummaryOut[]>(`/mesocycles${query}`);
+}
+
+export async function createMesocycle(body: MesocycleIn): Promise<MesocycleOut> {
+  return request<MesocycleOut>('/mesocycles', { method: 'POST', body });
+}
+
+export async function planGrid(mesocycleId: string): Promise<PlanGridOut> {
+  return request<PlanGridOut>(`/mesocycles/${mesocycleId}/plan`);
+}
+
+/**
+ * Fija (o libera) lo que manda el coach.
+ *
+ * Sin `weekNumber` toca la prescripción base, que vale para todo el bloque.
+ * Con `weekNumber` toca solo esa semana. Un campo en null devuelve ese aspecto
+ * al motor.
+ */
 export async function setPrescription(
   mesocycleId: string,
   exerciseId: string,
-  body: {
-    sets: number | null;
-    loadKg: number | null;
-    repLo: number | null;
-    repHi: number | null;
-    targetRir: number | null;
-    restSeconds: number;
-  },
+  body: PrescriptionIn,
 ): Promise<PrescriptionOut> {
   return request<PrescriptionOut>(
     `/mesocycles/${mesocycleId}/exercises/${exerciseId}/prescription`,
@@ -129,6 +148,18 @@ export async function createSession(
     method: 'POST',
     body: { weekNumber, dayLabel },
   });
+}
+
+/**
+ * La sesión abierta del atleta, o null si hoy no le toca.
+ *
+ * Null y no un error: "hoy no entrenas" es una respuesta normal del producto.
+ */
+export async function currentSession(
+  athleteId?: string,
+): Promise<SessionOut | null> {
+  const query = athleteId === undefined ? '' : `?athleteId=${athleteId}`;
+  return request<SessionOut | null>(`/sessions/current${query}`);
 }
 
 export async function getSession(id: string): Promise<SessionOut> {

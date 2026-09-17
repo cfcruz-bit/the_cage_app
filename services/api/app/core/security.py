@@ -32,13 +32,39 @@ TokenType = Literal["access", "refresh"]
 #: Parametros de Argon2id. Los de por defecto de argon2-cffi, explicitos para
 #: que se vea que son una decision y no un accidente. Subirlos endurece el
 #: hash pero encarece cada login: mide antes de tocarlos.
-_hasher: Final = PasswordHasher(
-    time_cost=3,
-    memory_cost=65536,  # 64 MiB
-    parallelism=4,
-    hash_len=32,
-    salt_len=16,
-)
+PRODUCTION_PARAMS: Final[dict[str, int]] = {
+    "time_cost": 3,
+    "memory_cost": 65536,  # 64 MiB
+    "parallelism": 4,
+    "hash_len": 32,
+    "salt_len": 16,
+}
+
+_hasher = PasswordHasher(**PRODUCTION_PARAMS)
+
+
+def use_fast_hashing_for_tests() -> None:
+    """Baja el coste de Argon2. **Solo para la suite de tests.**
+
+    Argon2 tarda ~150 ms por hash a proposito: es lo que hace inviable probar
+    contrasenas a lo bruto. Pero la suite crea decenas de cuentas y cada una
+    paga ese precio, asi que correrla entera pasaba de segundos a minutos. Una
+    suite de dos minutos es una suite que se deja de correr, y eso cuesta mas
+    que lo que ahorra.
+
+    Los tests comprueban la LOGICA —verificar, re-hashear, rechazar un hash
+    corrupto—, no la dureza del KDF, asi que bajar el coste no debilita nada de
+    lo que prueban.
+
+    Es una funcion y no una variable de entorno a proposito: una variable se
+    puede colar en produccion por accidente; esto hay que llamarlo desde el
+    codigo, y el unico sitio que lo hace es `tests/conftest.py`.
+    """
+    global _hasher
+    _hasher = PasswordHasher(
+        time_cost=1, memory_cost=8192, parallelism=1, hash_len=32, salt_len=16
+    )
+
 
 #: Longitud minima. Corta pero real: la defensa de verdad es el rate limiting
 #: del endpoint de login, no exigir simbolos raros que la gente apunta en un

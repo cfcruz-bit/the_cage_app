@@ -254,13 +254,36 @@ async def test_el_rango_de_reps_va_entero_o_vacio(session: AsyncSession) -> None
 
 
 @pytest.mark.asyncio
-async def test_un_ejercicio_tiene_como_mucho_una_prescripcion(
+async def test_una_prescripcion_por_ejercicio_y_semana(
     session: AsyncSession,
 ) -> None:
+    """La base, y una por semana. Dos veces la misma semana, no."""
+    _, mex = await _meso_con_ejercicio(session)
+
+    session.add(Prescription(mesocycle_exercise_id=mex.id, rest_seconds=150))
+    session.add(Prescription(mesocycle_exercise_id=mex.id, week_number=3, rest_seconds=120))
+    await session.flush()
+
+    session.add(Prescription(mesocycle_exercise_id=mex.id, week_number=3, rest_seconds=90))
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_no_hay_dos_prescripciones_base(session: AsyncSession) -> None:
+    """La base es una sola: si hubiera dos, ninguna mandaría de forma estable."""
     _, mex = await _meso_con_ejercicio(session)
     session.add(Prescription(mesocycle_exercise_id=mex.id, rest_seconds=150))
     await session.flush()
     session.add(Prescription(mesocycle_exercise_id=mex.id, rest_seconds=120))
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_la_semana_cero_no_existe(session: AsyncSession) -> None:
+    _, mex = await _meso_con_ejercicio(session)
+    session.add(Prescription(mesocycle_exercise_id=mex.id, week_number=0, rest_seconds=150))
     with pytest.raises(IntegrityError):
         await session.flush()
 

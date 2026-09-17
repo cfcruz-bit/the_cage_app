@@ -22,7 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.domain.autoregulation import plan_exercise, plan_sets
-from app.domain.math_utils import parse_leading_int, round6
+from app.domain.math_utils import parse_leading_int, round6, round_to
+from app.domain.projection import DELOAD_LOAD_FACTOR, DELOAD_RIR, DELOAD_SETS
 from app.domain.schemas import (
     Aggressiveness,
     Exercise,
@@ -40,6 +41,7 @@ from app.models import (
     DEFAULT_REST_SECONDS,
     ExerciseFeedback,
     MesocycleExercise,
+    Prescription,
     SessionExercise,
     SetLog,
     TrainingSession,
@@ -158,13 +160,46 @@ def to_domain_exercise(
     )
 
 
-def apply_prescription(exercise: Exercise, mex: MesocycleExercise) -> Exercise:
+def effective_prescription(
+    mex: MesocycleExercise, week_number: int | None = None
+) -> Prescription | None:
+    """La prescripcion que manda en esa semana.
+
+    Orden: la fila de la semana, si no la base, si no ninguna. Cada campo se
+    resuelve por separado, asi que retocar solo los sets de la semana 3 no
+    borra la carga que el coach habia fijado para todo el bloque.
+    """
+    base = mex.base_prescription
+    if week_number is None:
+        return base
+
+    week = mex.prescription_for(week_number)
+    if week is None:
+        return base
+    if base is None:
+        return week
+
+    return Prescription(
+        mesocycle_exercise_id=mex.id,
+        week_number=week_number,
+        sets=week.sets if week.sets is not None else base.sets,
+        load_kg=week.load_kg if week.load_kg is not None else base.load_kg,
+        rep_lo=week.rep_lo if week.rep_lo is not None else base.rep_lo,
+        rep_hi=week.rep_hi if week.rep_hi is not None else base.rep_hi,
+        target_rir=(week.target_rir if week.target_rir is not None else base.target_rir),
+        rest_seconds=week.rest_seconds,
+    )
+
+
+def apply_prescription(
+    exercise: Exercise, mex: MesocycleExercise, week_number: int | None = None
+) -> Exercise:
     """Rango y RIR del coach, si los puso.
 
     Se aplican ANTES de llamar al motor para que sus sugerencias ya respeten la
     prescripcion, en vez de calcular sobre un rango que el coach descarto.
     """
-    p = mex.prescription
+    p = effective_prescription(mex, week_number)
     if p is None:
         return exercise
     return exercise.model_copy(
@@ -180,17 +215,22 @@ def resolve_plan(
     exercise: Exercise,
     mex: MesocycleExercise,
     aggressiveness: Aggressiveness,
+    week_number: int | None = None,
 ) -> tuple[ExercisePlan, ExercisePlan]:
     """Devuelve (plan efectivo, sugerencia del motor).
 
     La sugerencia se conserva para que el coach vea al lado lo que el motor
     habria hecho por su cuenta. Sin eso, la pantalla de edicion no puede
     explicar por que un numero es distinto.
+
+    Lo que el coach fijo manda; lo que dejo vacio lo decide el motor con el RIR
+    y el feedback reales. Esa mezcla es el punto: pautar la semana 3 a mano no
+    congela las otras cinco.
     """
-    effective = apply_prescription(exercise, mex)
+    effective = apply_prescription(exercise, mex, week_number)
     suggestion = plan_exercise(effective, aggressiveness)
 
-    p = mex.prescription
+    p = effective_prescription(mex, week_number)
     if p is None or (p.sets is None and p.load_kg is None):
         return suggestion, suggestion
 
@@ -223,9 +263,10 @@ def _why_from_coach(*, load_overridden: bool, sets_overridden: bool, engine_why:
     return engine_why
 
 
-def rest_seconds_for(mex: MesocycleExercise) -> int:
+def rest_seconds_for(mex: MesocycleExercise, week_number: int | None = None) -> int:
     """El descanso SIEMPRE lo pauta el coach: no tiene modo automatico."""
-    return mex.prescription.rest_seconds if mex.prescription else DEFAULT_REST_SECONDS
+    p = effective_prescription(mex, week_number)
+    return p.rest_seconds if p is not None else DEFAULT_REST_SECONDS
 
 
 def sets_for(exercise: Exercise, plan: ExercisePlan, logs: list[SetLog]) -> list[SetPlan]:
@@ -259,3 +300,88 @@ async def feedback_for(
         )
     )
     return found.scalar_one_or_none()
+
+
+# ── Proyeccion del bloque entero ─────────────────────────────────────────────
+
+
+def project_grid(
+    exercise: Exercise,
+    mex: MesocycleExercise,
+    aggressiveness: Aggressiveness,
+    total_weeks: int,
+) -> list[dict]:
+    """Que hara este ejercicio en cada semana del bloque.
+
+    El esquema es el de doble progresion, igual que `project_mesocycle` del
+    motor: se sube un incremento de carga por semana y la ultima es el deload.
+    Se reutilizan sus constantes a proposito, para que esta tabla y la que
+    dibuja el movil no puedan contar cosas distintas.
+
+    Lo que el coach fija en una semana **arrastra**: si fuerza 80 kg en la
+    semana 3, la 4 progresa desde 80 y no desde donde iba la prevision. Lo
+    contrario —volver al carril original— haria que su intervencion pareciera
+    ignorada.
+
+    Esto es una PREVISION. Lo que de verdad pase lo recalcula el servidor con
+    el RIR y el feedback reales cuando se genere cada sesion.
+    """
+    base = plan_exercise(apply_prescription(exercise, mex), aggressiveness)
+    increment = exercise.load_increment_kg
+
+    rows: list[dict] = []
+
+    #: Desde donde extrapolar, y desde que semana. Se mueve cada vez que el
+    #: coach fija una carga a mano.
+    anchor_load = base.load_kg
+    anchor_week = 1
+    anchor_sets = base.sets
+
+    for week in range(1, total_weeks + 1):
+        is_deload = week == total_weeks
+        p = effective_prescription(mex, week)
+
+        rep_lo = p.rep_lo if p is not None and p.rep_lo is not None else exercise.rep_lo
+        rep_hi = p.rep_hi if p is not None and p.rep_hi is not None else exercise.rep_hi
+        target_rir = (
+            p.target_rir if p is not None and p.target_rir is not None else exercise.target_rir
+        )
+
+        if is_deload:
+            load_kg = round_to(anchor_load * DELOAD_LOAD_FACTOR, increment)
+            sets = DELOAD_SETS
+            if p is None or p.target_rir is None:
+                target_rir = DELOAD_RIR
+            if p is None or p.rep_hi is None:
+                rep_hi = rep_lo
+        else:
+            offset = week - anchor_week
+            load_kg = round_to(anchor_load + offset * increment, increment)
+            sets = anchor_sets
+
+        if p is not None and p.sets is not None:
+            sets = p.sets
+            anchor_sets = p.sets
+        if p is not None and p.load_kg is not None:
+            load_kg = p.load_kg
+            anchor_load = p.load_kg
+            anchor_week = week
+
+        rows.append(
+            {
+                "week_number": week,
+                "is_deload": is_deload,
+                "sets": sets,
+                "load_kg": load_kg,
+                "rep_lo": rep_lo,
+                "rep_hi": rep_hi,
+                "target_rir": target_rir,
+                "rest_seconds": rest_seconds_for(mex, week),
+                "sets_overridden": p is not None and p.sets is not None,
+                "load_overridden": p is not None and p.load_kg is not None,
+                "reps_overridden": p is not None and p.rep_lo is not None,
+                "rir_overridden": p is not None and p.target_rir is not None,
+            }
+        )
+
+    return rows

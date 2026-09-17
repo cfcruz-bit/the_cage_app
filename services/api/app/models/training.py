@@ -53,6 +53,20 @@ class MesocycleStatus(StrEnum):
     ARCHIVED = "archived"
 
 
+class TrainingGoal(StrEnum):
+    """Objetivo del bloque.
+
+    No cambia el comportamiento del motor: decide los valores POR DEFECTO con
+    los que entra cada ejercicio (rango de reps, RIR y series de arranque) y se
+    guarda para que coach y atleta sepan que se estaba buscando. Lo que el
+    coach ajuste encima manda.
+    """
+
+    STRENGTH = "fuerza"
+    HYPERTROPHY = "hipertrofia"
+    HYBRID = "hibrido"
+
+
 class ExerciseCatalog(Base, TimestampMixin):
     """Biblioteca de ejercicios.
 
@@ -97,6 +111,7 @@ class Mesocycle(Base, TimestampMixin):
     __tablename__ = "mesocycles"
     __table_args__ = (
         enum_check("status", MesocycleStatus, "estado_valido"),
+        enum_check("goal", TrainingGoal, "objetivo_valido"),
         enum_check("aggressiveness", Aggressiveness, "agresividad_valida"),
         CheckConstraint("total_weeks >= 2 AND total_weeks <= 24", name="semanas_validas"),
         CheckConstraint(
@@ -123,6 +138,9 @@ class Mesocycle(Base, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(
         String(12), nullable=False, default=MesocycleStatus.DRAFT.value
+    )
+    goal: Mapped[str] = mapped_column(
+        String(12), nullable=False, default=TrainingGoal.HYPERTROPHY.value
     )
     started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
@@ -169,23 +187,49 @@ class MesocycleExercise(Base, TimestampMixin):
 
     mesocycle: Mapped[Mesocycle] = relationship(back_populates="exercises")
     catalog: Mapped[ExerciseCatalog] = relationship()
-    prescription: Mapped[Prescription | None] = relationship(
+    prescriptions: Mapped[list[Prescription]] = relationship(
         back_populates="mesocycle_exercise",
         cascade="all, delete-orphan",
-        uselist=False,
+        order_by="Prescription.week_number",
     )
+
+    @property
+    def base_prescription(self) -> Prescription | None:
+        """La que vale para todo el bloque, si el coach puso alguna."""
+        for p in self.prescriptions:
+            if p.week_number is None:
+                return p
+        return None
+
+    def prescription_for(self, week_number: int) -> Prescription | None:
+        """La de esa semana concreta, si existe. No cae a la base."""
+        for p in self.prescriptions:
+            if p.week_number == week_number:
+                return p
+        return None
 
 
 class Prescription(Base, TimestampMixin):
     """Lo que el coach fijo a mano. NULL = lo decide el motor.
 
-    Espejo exacto de la interfaz `Prescription` del cliente. `rest_seconds` es
-    el unico campo NOT NULL porque el descanso SIEMPRE lo pauta el coach: no
-    tiene modo automatico.
+    Tiene DOS dimensiones: el ejercicio y la semana.
+
+    - `week_number` NULL es la prescripcion BASE: vale para todo el bloque.
+    - `week_number` N sobrescribe solo esa semana.
+
+    El orden al resolver la semana W es: fila de la semana W, si no la base, si
+    no el motor. Eso es lo que permite que el coach paute las seis semanas a
+    mano si quiere, o solo la tercera, sin que una cosa excluya a la otra: lo
+    que no toca lo sigue ajustando el motor con el RIR y el feedback reales.
+
+    `rest_seconds` es el unico campo NOT NULL porque el descanso SIEMPRE lo
+    pauta el coach: no tiene modo automatico.
     """
 
     __tablename__ = "prescriptions"
     __table_args__ = (
+        UniqueConstraint("mesocycle_exercise_id", "week_number"),
+        CheckConstraint("week_number IS NULL OR week_number >= 1", name="semana_valida"),
         CheckConstraint("sets IS NULL OR sets >= 1", name="sets_positivos"),
         CheckConstraint("load_kg IS NULL OR load_kg > 0", name="carga_positiva"),
         CheckConstraint(
@@ -201,8 +245,10 @@ class Prescription(Base, TimestampMixin):
         Uuid,
         ForeignKey("mesocycle_exercises.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
     )
+
+    #: NULL = vale para todas las semanas. N = solo para la semana N.
+    week_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -218,4 +264,4 @@ class Prescription(Base, TimestampMixin):
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    mesocycle_exercise: Mapped[MesocycleExercise] = relationship(back_populates="prescription")
+    mesocycle_exercise: Mapped[MesocycleExercise] = relationship(back_populates="prescriptions")

@@ -7,7 +7,6 @@
  */
 
 import { create } from 'zustand';
-import type { MuscleFilter } from '@/data/library';
 import type { DeviationTarget } from '@/features/workout/DeviationSheet';
 
 interface UiState {
@@ -37,9 +36,17 @@ interface UiState {
   closeNewMeso: () => void;
 
   /** Filtros de la pantalla de Ejercicios. */
-  filter: MuscleFilter;
+  /**
+   * Filtro del catálogo: 'Todos' o una clave de músculo del servidor
+   * (`CHEST`, `BACK`...).
+   *
+   * Es un string y no una unión cerrada a propósito: los músculos los define
+   * el servidor, y si algún día añade uno, la app no debe dejar de compilar
+   * por ello.
+   */
+  filter: string;
   query: string;
-  setFilter: (f: MuscleFilter) => void;
+  setFilter: (f: string) => void;
   setQuery: (q: string) => void;
 }
 

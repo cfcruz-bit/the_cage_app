@@ -1,0 +1,117 @@
+# Integración continua de The Cage 2.0.
+#
+# Tres trabajos, deliberadamente separados para que el fallo diga QUÉ se rompió
+# sin tener que abrir el log:
+#
+#   engine   el motor en TypeScript y el typecheck de la app
+#   api      el backend en Python: lint, migraciones y tests
+#   contrato el que de verdad importa — que las dos implementaciones del motor
+#            sigan dando el mismo número
+#
+# El trabajo `contrato` regenera golden/cases.json con la implementación
+# TypeScript y falla si el archivo versionado cambió. Es la alarma que describe
+# el docstring de scripts/generate-golden.ts: si una regla se movió sin querer,
+# el diff de ese archivo lo delata antes de que un atleta entrene con el número
+# malo. Si el cambio fue a propósito, regeneras y commiteas el diff.
+#
+# Los tests de Python usan SQLite en archivo y levantan el esquema con
+# `alembic upgrade head`, así que aquí no hace falta un servicio de Postgres:
+# se ejercita el mismo camino que correrá en producción.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# Un push nuevo sobre la misma rama cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Motor TypeScript + app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` en la raíz instala los tres workspaces de una vez.
+      - run: npm ci
+
+      - name: Tests del motor
+        run: npm test
+
+      # Typecheck del motor y de la app móvil. Requiere que las dependencias de
+      # Expo estén instaladas, de ahí que vaya después de `npm ci` en la raíz.
+      - name: Typecheck
+        run: npm run typecheck
+
+  api:
+    name: Backend Python
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+
+      # La misma versión que la imagen de producción (ver Dockerfile).
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: services/api/pyproject.toml
+
+      - run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Formato
+        run: ruff format --check .
+
+      # Que las migraciones apliquen limpio sobre una base vacía no lo prueba
+      # pytest por sí solo: aquí se comprueba aparte, y `alembic check` avisa si
+      # los modelos se movieron sin su migración.
+      - name: Migraciones
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./ci.db
+        run: |
+          alembic upgrade head
+          alembic check
+
+      - name: Tests
+        run: pytest -q
+
+  contrato:
+    name: Contrato TS ↔ Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regenerar los casos golden
+        run: npm run golden
+
+      # Si este paso falla, el motor TypeScript ya no produce el archivo que
+      # está versionado. Regenera con `npm run golden`, revisa el diff a mano y
+      # commitéalo solo si el cambio de regla era intencional.
+      - name: El archivo golden no cambió
+        run: git diff --exit-code -- packages/engine/golden/cases.json

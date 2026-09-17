@@ -26,5 +26,10 @@ venv/
 Thumbs.db
 *.log
 
+# Base de datos local de desarrollo — nunca al repo
+*.db
+*.db-shm
+*.db-wal
+
 # Temporales de vitest
 *.timestamp-*.mjs

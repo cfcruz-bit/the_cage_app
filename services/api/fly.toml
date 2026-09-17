@@ -1,0 +1,47 @@
+# Despliegue de la API de The Cage en Fly.io.
+#
+#   fly launch --no-deploy     (una sola vez, crea la app)
+#   fly deploy
+#
+# La region es Santiago de Chile: es la mas cercana a Nicaragua de las que Fly
+# ofrece en Sudamerica. Si notas latencia alta, `fly platform regions` lista
+# las disponibles y `mia` (Miami) suele ser buena alternativa desde Centroamerica.
+
+app = "the-cage-api"
+primary_region = "scl"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Las migraciones corren ANTES de que entre trafico a la version nueva. Si
+# fallan, el despliegue se aborta y la version anterior sigue sirviendo: es lo
+# que evita que una migracion rota tire el gimnasio entero.
+[deploy]
+  release_command = "alembic upgrade head"
+
+[env]
+  ENVIRONMENT = "production"
+  DEBUG = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Cero maquinas paradas costaria menos, pero la primera peticion del dia
+  # tardaria en arrancar. Una encendida es la diferencia entre una app que
+  # responde y una que "va lenta".
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  # 512 MB da margen a Argon2, que reserva 64 MiB por hash y puede tener varios
+  # logins a la vez. Con 256 MB el contenedor muere justo cuando entra gente.
+  memory = "512mb"

@@ -28,7 +28,8 @@
     },
     "icon": "./assets/icon.png",
     "extra": {
-      "apiUrl": "http://localhost:8000"
+      "_comment": "Vacio = la app deduce la IP del servidor de Metro. Rellenar solo en produccion.",
+      "apiUrl": ""
     }
   }
 }

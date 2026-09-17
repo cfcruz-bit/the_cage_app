@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Cage · Administración</title>
+<!--
+  Favicon incrustado.
+
+  Sin esto el navegador pide /favicon.ico en cada carga y la API responde 404,
+  que aparece en rojo en el log del servidor y hace dudar de si algo va mal.
+  Un data: URI lo resuelve sin añadir una ruta ni un archivo.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0a'/%3E%3Crect x='6' y='14' width='20' height='4' fill='%23e04a3a'/%3E%3Crect x='3' y='10' width='4' height='12' fill='%23e04a3a'/%3E%3Crect x='25' y='10' width='4' height='12' fill='%23e04a3a'/%3E%3C/svg%3E">
 <style>
   /* Los mismos tokens que la app. Si cambian allí, cambian aquí. */
   :root {

@@ -121,14 +121,42 @@ Los tests crean su esquema con `alembic upgrade head`, no con
 podrías tener una migración rota y los tests seguirían verdes hasta el
 despliegue.
 
-## Levantar la API
+## Levantar todo
+
+Desde la **raíz del repo**, un solo comando levanta la API y Metro a la vez:
 
 ```powershell
-uvicorn app.main:app --reload
+npm run dev
 ```
+
+Te imprime la IP de tu máquina y las tres direcciones útiles. `Ctrl+C` cierra
+las dos cosas. Existe porque olvidarse de levantar uvicorn produce un "sin
+conexión" en el móvil que parece un bug de la app y no lo es.
+
+**El móvil encuentra la API solo.** No hay que buscar la IPv4 del adaptador
+Wi-Fi ni tocar `app.json`: el teléfono acaba de descargar el bundle de Metro, o
+sea que ya sabe la IP de tu PC, y la app le cambia el puerto por el 8000.
+`extra.apiUrl` en `app.json` solo se rellena en producción, donde no hay Metro
+del que deducir nada.
+
+Solo la API, si lo prefieres:
+
+```powershell
+cd services\api
+.venv\Scripts\activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+`--host 0.0.0.0` es lo que la hace visible desde el teléfono; sin eso solo
+escucha en la propia máquina.
 
 Documentación interactiva en `http://127.0.0.1:8000/docs`. En producción se
 apaga: es un mapa completo de la superficie de ataque.
+
+## Desplegar
+
+Ver **[DESPLIEGUE.md](DESPLIEGUE.md)**: Fly.io, Postgres gestionado y HTTPS.
+El `Dockerfile` y el `fly.toml` de este directorio ya están configurados.
 
 ## Sembrar el catálogo
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Valor de relleno para desarrollo. Si aparece en produccion, la app no
@@ -36,6 +36,25 @@ class Settings(BaseSettings):
 
     #: DSN asincrono. En produccion SIEMPRE postgresql+asyncpg.
     database_url: str = "sqlite+aiosqlite:///./cage.db"
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalizar_driver(cls, value: str) -> str:
+        """Convierte el DSN que dan los proveedores al driver asincrono.
+
+        Fly, Render y Railway inyectan `DATABASE_URL` con la forma
+        `postgres://...` o `postgresql://...`, que SQLAlchemy resuelve al
+        driver SINCRONO psycopg2 — que esta app no instala. El resultado seria
+        un fallo en el arranque del primer despliegue con un mensaje sobre un
+        modulo que nadie escribio.
+
+        Se normaliza aqui y no en el proveedor para que nadie tenga que
+        acordarse de reescribir la variable a mano cada vez que se rota.
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+asyncpg://" + value[len(prefix) :]
+        return value
 
     #: Clave de firma de los JWT. Minimo 32 bytes: por debajo de eso HS256
     #: tiene menos entropia que su propia salida (RFC 7518, seccion 3.2) y

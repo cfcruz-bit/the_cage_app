@@ -17,7 +17,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -126,7 +126,7 @@ async def create_session(
         .order_by(MesocycleExercise.position)
         .options(
             selectinload(MesocycleExercise.catalog),
-            selectinload(MesocycleExercise.prescription),
+            selectinload(MesocycleExercise.prescriptions),
         )
     )
     aggressiveness = Aggressiveness(meso.aggressiveness)
@@ -136,7 +136,7 @@ async def create_session(
         exercise = to_domain_exercise(
             mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
         )
-        plan, _suggestion = resolve_plan(exercise, mex, aggressiveness)
+        plan, _suggestion = resolve_plan(exercise, mex, aggressiveness, body.week_number)
 
         session.add(
             SessionExercise(
@@ -151,6 +151,49 @@ async def create_session(
         )
 
     await session.commit()
+    return await _render(session, ts.id)
+
+
+@router.get("/sessions/current", response_model=SessionOut | None)
+async def current_session(
+    session: SessionDep,
+    user: ActiveUser,
+    # El alias es obligatorio: los parametros de consulta NO pasan por el
+    # alias_generator de los DTO, asi que sin esto `athleteId` no se enlaza y
+    # llega None en silencio.
+    athlete_id: Annotated[uuid.UUID | None, Query(alias="athleteId")] = None,
+) -> SessionOut | None:
+    """La sesion abierta del atleta, si la hay.
+
+    Es lo primero que pide el movil al abrir la pestana de entreno. Devuelve
+    `null` y no 404 cuando no hay ninguna: "hoy no te toca" es una respuesta
+    normal del producto, no un error, y un 404 obligaria a cada pantalla a
+    distinguir entre "no hay sesion" y "algo se rompio".
+
+    Se busca la mas reciente SIN cerrar. Una sesion cerrada ya no se entrena;
+    se consulta desde el historial.
+    """
+    target = user.id
+    if user.role == UserRole.COACH:
+        if athlete_id is None:
+            return None
+        if not await coach_leads_athlete(session, user.id, athlete_id):
+            raise NO_ENCONTRADO
+        target = athlete_id
+
+    found = await session.execute(
+        select(TrainingSession)
+        .join(Mesocycle, TrainingSession.mesocycle_id == Mesocycle.id)
+        .where(
+            Mesocycle.athlete_id == target,
+            TrainingSession.completed_at.is_(None),
+        )
+        .order_by(TrainingSession.created_at.desc())
+        .limit(1)
+    )
+    ts = found.scalar_one_or_none()
+    if ts is None:
+        return None
     return await _render(session, ts.id)
 
 
@@ -266,7 +309,7 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
             .where(MesocycleExercise.id == se.mesocycle_exercise_id)
             .options(
                 selectinload(MesocycleExercise.catalog),
-                selectinload(MesocycleExercise.prescription),
+                selectinload(MesocycleExercise.prescriptions),
             )
         )
         mex = mex_found.scalar_one()
@@ -287,9 +330,10 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                 muscle=mex.catalog.muscle,
                 planned_load_kg=se.planned_load_kg,
                 planned_sets=se.planned_sets,
-                rest_seconds=rest_seconds_for(mex),
+                rest_seconds=rest_seconds_for(mex, ts.week_number),
                 policy_version=se.policy_version,
                 why=se.why,
+                exercise=exercise,
                 sets=[
                     PlannedSetOut(
                         index=s.index,

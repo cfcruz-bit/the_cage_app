@@ -26,7 +26,15 @@ from alembic.config import Config
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import security as _security
+
 API_ROOT = Path(__file__).resolve().parents[1]
+
+# Argon2 con parametros de produccion tarda ~150 ms por hash, y esta suite crea
+# decenas de cuentas. Con los de produccion tardaba mas de dos minutos; con
+# estos, segundos. Ver `use_fast_hashing_for_tests` para por que no debilita lo
+# que estos tests comprueban.
+_security.use_fast_hashing_for_tests()
 
 
 def _alembic_config(db_url: str) -> Config:

@@ -20,6 +20,7 @@ from app.models.training import (
     MesocycleExercise,
     MesocycleStatus,
     Prescription,
+    TrainingGoal,
 )
 from app.models.user import (
     CoachAthlete,
@@ -43,6 +44,7 @@ __all__ = [
     "RefreshToken",
     "SessionExercise",
     "SetLog",
+    "TrainingGoal",
     "TrainingSession",
     "User",
     "UserRole",

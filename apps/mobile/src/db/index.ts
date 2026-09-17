@@ -146,6 +146,92 @@ async function migrate(database: SQLite.SQLiteDatabase): Promise<void> {
       PRAGMA user_version = 3;
     `);
   }
+
+  if (current < 4) {
+    // Fuera los ejercicios de demostracion del prototipo.
+    //
+    // Hasta ahora la app sembraba tres ejercicios de ejemplo la primera vez
+    // que se abria, para que la pantalla de entreno tuviera algo que enseñar
+    // antes de que existiera el servidor. Ya existe, y esos datos falsos solo
+    // confunden: un atleta no tiene que ver un press de banca que nadie le
+    // pauto.
+    //
+    // Se borra tambien lo que colgaba de ellos. Sin esto, los telefonos que ya
+    // abrieron la app se quedarian con los tres ejercicios para siempre,
+    // porque quitar la siembra no deshace la siembra ya hecha.
+    await database.execAsync(`
+      DELETE FROM set_logs;
+      DELETE FROM exercise_feedback;
+      DELETE FROM prescriptions;
+      DELETE FROM exercises;
+      DELETE FROM settings WHERE key = 'seeded_v1';
+
+      PRAGMA user_version = 4;
+    `);
+  }
+
+  if (current < 5) {
+    // Cache de la sesion que manda el servidor.
+    //
+    // Se guarda el JSON entero tal cual llega. Podria normalizarse en tablas,
+    // pero no hay nada que consultar por partes: la pantalla necesita la
+    // sesion completa o ninguna. Guardar el JSON hace que un cambio en la
+    // forma de la respuesta no exija una migracion.
+    //
+    // Existe por una sola razon: que el atleta abra la app en un sotano sin
+    // cobertura y vea lo que le toca entrenar.
+    await database.execAsync(`
+      CREATE TABLE IF NOT EXISTS remote_sessions (
+        id         TEXT PRIMARY KEY,
+        payload    TEXT NOT NULL,
+        fetched_at TEXT NOT NULL
+      );
+
+      PRAGMA user_version = 5;
+    `);
+  }
+}
+
+/* ── Cache de la sesion del servidor ──────────────────────────────────────── */
+
+export async function cacheSession(id: string, payload: unknown): Promise<void> {
+  const database = await openDb();
+  await database.runAsync(
+    `INSERT INTO remote_sessions (id, payload, fetched_at) VALUES (?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       payload = excluded.payload, fetched_at = excluded.fetched_at`,
+    id,
+    JSON.stringify(payload),
+    new Date().toISOString(),
+  );
+}
+
+export async function readCachedSession<T>(id: string): Promise<T | null> {
+  const database = await openDb();
+  const row = await database.getFirstAsync<{ payload: string }>(
+    'SELECT payload FROM remote_sessions WHERE id = ?',
+    id,
+  );
+  return row === null ? null : parse<T>(row.payload);
+}
+
+/** La ultima sesion cacheada. Es lo que se abre cuando no hay red. */
+export async function readLastCachedSession<T>(): Promise<T | null> {
+  const database = await openDb();
+  const row = await database.getFirstAsync<{ payload: string }>(
+    'SELECT payload FROM remote_sessions ORDER BY fetched_at DESC LIMIT 1',
+  );
+  return row === null ? null : parse<T>(row.payload);
+}
+
+function parse<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    // Una cache corrupta no puede impedir abrir la app: se trata como si no
+    // hubiera nada guardado y se pide al servidor.
+    return null;
+  }
 }
 
 /* ── Ajustes ──────────────────────────────────────────────────────────────── */

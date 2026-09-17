@@ -17,7 +17,8 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.security import MIN_PASSWORD_LENGTH
-from app.domain.schemas import Aggressiveness, Feedback, MuscleGroup
+from app.domain.schemas import Aggressiveness, Exercise, Feedback, MuscleGroup
+from app.models.training import TrainingGoal
 
 
 def _camel(snake: str) -> str:
@@ -140,12 +141,15 @@ class MesocycleIn(ApiModel):
     name: str = Field(min_length=1, max_length=120)
     total_weeks: int = Field(default=6, ge=2, le=24)
     aggressiveness: Aggressiveness = Aggressiveness.MEDIUM
+    goal: TrainingGoal = TrainingGoal.HYPERTROPHY
     exercises: list[MesocycleExerciseIn] = Field(min_length=1, max_length=40)
 
 
 class PrescriptionIn(ApiModel):
     """Lo que el coach fija a mano. null = lo decide el motor."""
 
+    #: None = para todo el bloque. N = solo para la semana N.
+    week_number: int | None = Field(default=None, ge=1, le=24)
     sets: int | None = Field(default=None, ge=1, le=20)
     load_kg: float | None = Field(default=None, gt=0, le=1000)
     rep_lo: int | None = Field(default=None, ge=1, le=100)
@@ -168,7 +172,27 @@ class MesocycleExerciseOut(ApiModel):
     rep_hi: int
     target_rir: int
     load_increment_kg: float
+    #: Punto de partida de la semana 1. Viaja al cliente porque el movil usa el
+    #: MISMO motor para dibujar la proyeccion del mesociclo sin pedir nada mas.
+    starting_load_kg: float
+    starting_reps: int
+    starting_sets: int
     prescription: PrescriptionOut | None
+
+
+class MesocycleSummaryOut(ApiModel):
+    """Una fila de la lista de mesociclos. Sin los ejercicios."""
+
+    id: uuid.UUID
+    athlete_id: uuid.UUID
+    athlete_name: str
+    name: str
+    total_weeks: int
+    current_week_index: int
+    aggressiveness: str
+    goal: str
+    status: str
+    exercise_count: int
 
 
 class MesocycleOut(ApiModel):
@@ -179,6 +203,7 @@ class MesocycleOut(ApiModel):
     total_weeks: int
     current_week_index: int
     aggressiveness: str
+    goal: str
     status: str
     exercises: list[MesocycleExerciseOut]
 
@@ -213,6 +238,15 @@ class SessionExerciseOut(ApiModel):
     policy_version: str
     why: str
     sets: list[PlannedSetOut]
+
+    #: El ejercicio tal como lo entiende el motor, incluido lo que hizo la vez
+    #: anterior.
+    #:
+    #: Viaja para que el movil pueda enseñarle al atleta el EFECTO de su
+    #: feedback antes de enviarlo: "esto subiria la carga a 65 kg". Ese calculo
+    #: tiene que ser instantaneo y funcionar sin cobertura, asi que lo hace el
+    #: cliente con el mismo motor. Lo que se persiste sigue saliendo de aqui.
+    exercise: Exercise
 
 
 class SessionOut(ApiModel):
@@ -402,3 +436,64 @@ class AdminUserRow(ApiModel):
     days_left: int | None
     #: "activo" | "por vencer" | "vencido" | "sin acceso" | "no caduca"
     status: str
+
+
+# ── La rejilla del plan ──────────────────────────────────────────────────────
+
+
+class PlanCellOut(ApiModel):
+    """Lo que hara un ejercicio en una semana concreta.
+
+    Los `*_overridden` son lo que hace util a esta pantalla: sin ellos, el
+    coach no puede distinguir un numero que puso el de uno que calculo el
+    motor, y no sabria que esta a punto de pisar.
+    """
+
+    week_number: int
+    is_deload: bool
+    sets: int
+    load_kg: float
+    rep_lo: int
+    rep_hi: int
+    target_rir: int
+    rest_seconds: int
+
+    sets_overridden: bool
+    load_overridden: bool
+    reps_overridden: bool
+    rir_overridden: bool
+
+    @property
+    def any_overridden(self) -> bool:
+        return (
+            self.sets_overridden
+            or self.load_overridden
+            or self.reps_overridden
+            or self.rir_overridden
+        )
+
+
+class PlanRowOut(ApiModel):
+    """Un ejercicio, con sus N semanas."""
+
+    mesocycle_exercise_id: uuid.UUID
+    name: str
+    muscle: str
+    equipment: str
+    weeks: list[PlanCellOut]
+
+
+class PlanGridOut(ApiModel):
+    """El mesociclo entero como tabla: ejercicios x semanas.
+
+    Se calcula en el SERVIDOR y no en el movil aunque el motor este en los dos
+    sitios, porque proyectar necesita el historico real de cada semana, y eso
+    solo lo tiene la base.
+    """
+
+    mesocycle_id: uuid.UUID
+    name: str
+    goal: str
+    total_weeks: int
+    current_week_index: int
+    rows: list[PlanRowOut]
