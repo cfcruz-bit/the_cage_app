@@ -29,10 +29,12 @@ from sqlalchemy import (
     Date,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -238,6 +240,22 @@ class Prescription(Base, TimestampMixin):
             name="rango_completo_o_vacio",
         ),
         CheckConstraint("rest_seconds > 0 AND rest_seconds <= 900", name="descanso_razonable"),
+        # Indice parcial: impide DOS prescripciones base para el mismo
+        # ejercicio. El UNIQUE de arriba no lo cubre, porque tanto SQLite como
+        # Postgres consideran que dos NULL son distintos.
+        #
+        # Va declarado aqui, y no solo en la migracion que lo crea, porque si
+        # no el modelo y la base discrepan: en Postgres `alembic check` lo ve
+        # reflejado, no lo encuentra en los modelos y propone BORRARLO. Un
+        # --autogenerate a ciegas habria generado esa migracion y tirado la
+        # unica proteccion que hay contra dos bases simultaneas.
+        Index(
+            "uq_prescriptions_base",
+            "mesocycle_exercise_id",
+            unique=True,
+            sqlite_where=text("week_number IS NULL"),
+            postgresql_where=text("week_number IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)

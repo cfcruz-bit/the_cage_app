@@ -3,12 +3,17 @@
 Una sola vez de configuración, y después `fly deploy` cada vez que quieras
 subir cambios.
 
-> **Antes de empezar.** Este documento es el único de todo el repo que **no
-> está verificado ejecutándose**. El resto del código se probó antes de
-> entregarlo; esto no se puede, porque necesita una cuenta tuya y una tarjeta.
-> Está escrito con cuidado y los comandos son los oficiales de Fly, pero
-> asumí que algo va a fallar la primera vez: al final hay una sección con los
-> tropiezos que espero.
+> **Qué está verificado y qué no.** Todo lo que ocurre *dentro* del servidor se
+> probó contra un PostgreSQL 16 de verdad, con `ENVIRONMENT=production`: las
+> migraciones, el siembrado del catálogo, el alta del administrador, el login
+> con Argon2, el corte por membresía vencida y la renovación. Lo que **no** se
+> ha podido probar es lo que depende de Fly: la construcción de la imagen
+> Docker y los comandos `fly`. El registro de Docker está bloqueado desde donde
+> se escribió esto, así que la imagen nunca se construyó. Al final hay una
+> sección con los tropiezos que espero.
+>
+> Esa prueba contra Postgres encontró dos fallos reales que SQLite ocultaba.
+> Están corregidos y con tests; se cuentan al final del documento.
 
 ## 1. Instalar Fly
 
@@ -122,6 +127,29 @@ está arrancando y el health check todavía no pasó.
 **El primer login tarda un segundo.** Es Argon2 haciendo su trabajo en una
 máquina compartida. Es el precio de que una contraseña robada no se pueda
 probar a lo bruto.
+
+## Lo que la prueba contra Postgres encontró
+
+Merece la pena contarlo, porque los dos fallos eran invisibles en desarrollo.
+
+**El índice parcial que protege las prescripciones se iba a borrar solo.**
+`uq_prescriptions_base` impide que un mismo ejercicio tenga dos prescripciones
+base. Existía en la migración pero no estaba declarado en los modelos. En
+SQLite no se nota, porque los índices parciales no se reflejan con su
+condición y `migrations/env.py` los excluye de la comparación a propósito. En
+Postgres sí se reflejan: `alembic check` lo encontraba en la base, no lo veía
+en los modelos y proponía **borrarlo**. El día que alguien corriera
+`--autogenerate` sin leer el diff, se habría llevado por delante la única
+protección contra dos bases simultáneas. Ahora está en `__table_args__` y hay
+un test que lo comprueba.
+
+**Se podía crear un administrador incapaz de entrar.** `scripts/create_admin.py`
+solo verificaba que el email tuviera una arroba; el endpoint de login valida
+con `EmailStr`, que es más estricto y rechaza dominios reservados como
+`.test` o `.local`. Un admin creado con uno de esos recibe `422` al intentar
+entrar — y como el script se niega a crear un segundo administrador, la única
+salida habría sido editar la base a mano desde una consola SSH. Ahora el
+script usa el mismo validador que la API y avisa antes de escribir nada.
 
 ## Lo que NO está resuelto
 

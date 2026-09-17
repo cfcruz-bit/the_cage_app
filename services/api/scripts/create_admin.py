@@ -21,6 +21,7 @@ import asyncio
 import getpass
 import sys
 
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import select
 
 from app.core.config import get_settings
@@ -28,8 +29,27 @@ from app.core.security import MIN_PASSWORD_LENGTH, hash_password
 from app.db.session import build_engine, build_sessionmaker
 from app.models import User, UserRole
 
+#: El MISMO validador que usan los DTO de la API.
+#:
+#: Sin esto el script aceptaba cualquier cosa con una arroba, pero el endpoint
+#: de login valida con EmailStr, que es mas estricto (rechaza dominios
+#: reservados como .test o .local). Se podia crear un administrador con un
+#: email con el que era IMPOSIBLE entrar — y como el script se niega a crear un
+#: segundo admin, la unica salida era editar la base a mano.
+_EMAIL = TypeAdapter(EmailStr)
+
+
+def normalizar_email(crudo: str) -> str:
+    """Devuelve el email en minusculas, o lanza ValueError si la API lo rechazaria."""
+    limpio = crudo.strip().lower()
+    try:
+        return _EMAIL.validate_python(limpio)
+    except ValidationError as exc:
+        raise ValueError(f"La API rechazaria este email: {exc.errors()[0]['msg']}") from exc
+
 
 async def create(email: str, name: str, password: str) -> str:
+    email = normalizar_email(email)
     engine = build_engine(get_settings())
     factory = build_sessionmaker(engine)
 
@@ -66,9 +86,10 @@ async def create(email: str, name: str, password: str) -> str:
 def main() -> None:
     print("Alta del administrador de The Cage.\n")
 
-    email = input("Email: ").strip().lower()
-    if "@" not in email:
-        sys.exit("Eso no parece un email.")
+    try:
+        email = normalizar_email(input("Email: "))
+    except ValueError as exc:
+        sys.exit(str(exc))
 
     name = input("Nombre: ").strip()
     if not name:
