@@ -37,13 +37,26 @@ const API_PORT = 8000;
  * Eso elimina el paso de buscar la IPv4 del adaptador Wi-Fi a mano, que además
  * hay que repetir cada vez que el router reparte una dirección distinta.
  *
- * `extra.apiUrl` en `app.json` sigue mandando cuando tiene valor: es lo que se
- * usa en producción, donde no hay Metro del que deducir nada. Vacío = automático.
+ * En una build de producción no hay Metro del que deducir nada, así que manda
+ * `extra.apiUrl` de `app.json` — el servidor desplegado en Fly.
+ *
+ * El orden importa y es a propósito: **en desarrollo gana la autodetección**,
+ * aunque `apiUrl` tenga valor. Si mandara siempre, cada vez que arrancaras
+ * Metro para probar un cambio estarías escribiendo en la base de producción,
+ * con las membresías y las sesiones de atletas reales dentro. Es un accidente
+ * que solo se comete una vez, pero no tiene deshacer.
+ *
+ * Para probar a propósito contra el servidor real desde Metro, pon
+ * `extra.forceApiUrl: true` en `app.json` — y acuérdate de quitarlo.
  */
 function resolveApiUrl(): string {
-  const configured = Constants.expoConfig?.extra?.apiUrl;
-  if (typeof configured === 'string' && configured.trim().length > 0) {
-    return configured.trim().replace(/\/+$/, '');
+  const crudo = Constants.expoConfig?.extra?.apiUrl;
+  const configured =
+    typeof crudo === 'string' ? crudo.trim().replace(/\/+$/, '') : '';
+  const forzado = Constants.expoConfig?.extra?.forceApiUrl === true;
+
+  if (configured.length > 0 && (!__DEV__ || forzado)) {
+    return configured;
   }
 
   const hostUri =
@@ -68,7 +81,10 @@ export const API_URL = resolveApiUrl();
 // distinguir "el servidor no responde" de "la app está mirando a la dirección
 // equivocada", que producen el mismo mensaje en pantalla y se arreglan distinto.
 if (__DEV__) {
-  console.log(`[cage] API en ${API_URL}`);
+  const remoto = API_URL.startsWith('https://');
+  console.log(
+    `[cage] API en ${API_URL}${remoto ? '  ← PRODUCCIÓN, cuidado con lo que escribes' : ''}`,
+  );
 }
 
 const PREFIX = '/api/v1';

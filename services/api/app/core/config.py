@@ -16,10 +16,65 @@ from functools import lru_cache
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 #: Valor de relleno para desarrollo. Si aparece en produccion, la app no
 #: arranca: ver `_no_arrancar_en_produccion_con_la_clave_de_ejemplo`.
 DEV_JWT_SECRET = "dev-only-change-me-dev-only-change-me-0123"
+
+
+#: Parametros del DSN que entiende libpq (psql, psycopg2) pero no asyncpg.
+#:
+#: Neon, Supabase y compania entregan cadenas del estilo
+#:     postgresql://u:p@host/db?sslmode=require&channel_binding=require
+#: Pegarla tal cual en DATABASE_URL tumba la app al arrancar con un
+#: `TypeError: connect() got an unexpected keyword argument 'sslmode'`, porque
+#: SQLAlchemy pasa los parametros de la query directos a `asyncpg.connect()`.
+#:
+#: asyncpg si entiende `ssl`, y acepta los mismos valores que `sslmode`
+#: (disable, allow, prefer, require, verify-ca, verify-full), asi que basta con
+#: renombrarlo. `channel_binding` no tiene equivalente y se descarta: es una
+#: comprobacion extra de libpq, no un requisito del servidor.
+_RENOMBRAR = {"sslmode": "ssl"}
+_DESCARTAR = frozenset({"channel_binding"})
+
+#: Senales de que al otro lado hay un PgBouncer en modo transaccion.
+#:
+#: Neon llama `-pooler` a ese endpoint; Supabase marca el DSN con
+#: `pgbouncer=true`. Por ahi las conexiones se reparten entre peticiones, y las
+#: sentencias preparadas que asyncpg deja cacheadas acaban en una sesion que ya
+#: no es la suya: `prepared statement "__asyncpg_stmt_1__" already exists`. El
+#: error aparece bajo carga y no en las pruebas, que es lo peor que puede pasar.
+_MARCAS_DE_POOL = ("-pooler", "pgbouncer=true")
+
+
+def _traducir_parametros_libpq(dsn: str) -> str:
+    """Reescribe la query del DSN a lo que asyncpg sabe recibir.
+
+    Se hace aqui, y no pidiendote que edites la cadena a mano, porque esa
+    cadena se rota cada vez que cambias la contrasena de la base: cualquier
+    arreglo manual se pierde a la siguiente rotacion.
+    """
+    url = make_url(dsn)
+    por_pool = any(marca in dsn for marca in _MARCAS_DE_POOL)
+    if not url.query and not por_pool:
+        return dsn
+
+    query = dict(url.query)
+    for clave in _DESCARTAR:
+        query.pop(clave, None)
+    for origen, destino in _RENOMBRAR.items():
+        if origen not in query:
+            continue
+        valor = query.pop(origen)
+        # Si el DSN ya trae el nombre bueno, manda ese y se ignora el viejo.
+        query.setdefault(destino, valor)
+
+    # Con un pooler por delante, la cache de sentencias preparadas se apaga.
+    if por_pool:
+        query.setdefault("prepared_statement_cache_size", "0")
+
+    return url.set(query=query).render_as_string(hide_password=False)
 
 
 class Settings(BaseSettings):
@@ -51,9 +106,22 @@ class Settings(BaseSettings):
         Se normaliza aqui y no en el proveedor para que nadie tenga que
         acordarse de reescribir la variable a mano cada vez que se rota.
         """
+        # Se quita CUALQUIER espacio en blanco, incluidos saltos de linea en
+        # medio. Los paneles de Neon y compania muestran el DSN partido en
+        # varias lineas para que quepa en la caja; copiarlo con el raton en vez
+        # de con su boton se trae el salto, y el sintoma es un
+        # "Could not parse SQLAlchemy URL" a mil lineas de distancia de la
+        # causa. Un DSN legal no lleva espacios: lo que hubiera que escribir
+        # con uno va codificado como %20.
+        value = "".join(value.split())
+
         for prefix in ("postgres://", "postgresql://"):
             if value.startswith(prefix):
-                return "postgresql+asyncpg://" + value[len(prefix) :]
+                value = "postgresql+asyncpg://" + value[len(prefix) :]
+                break
+
+        if value.startswith("postgresql+asyncpg://"):
+            value = _traducir_parametros_libpq(value)
         return value
 
     #: Clave de firma de los JWT. Minimo 32 bytes: por debajo de eso HS256

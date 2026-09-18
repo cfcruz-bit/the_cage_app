@@ -73,3 +73,79 @@ def test_normalizar_email_rechaza_lo_que_la_api_rechazaria(malo: str) -> None:
     """
     with pytest.raises(ValueError):
         normalizar_email(malo)
+
+
+# ── El DSN que entregan los proveedores ──────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "crudo, esperado",
+    [
+        # Neon, copiado tal cual de su panel. Sin traduccion, la app arranca y
+        # muere con "connect() got an unexpected keyword argument 'sslmode'".
+        (
+            "postgresql://u:p@ep-abc-123.sa-east-1.aws.neon.tech/cage"
+            "?sslmode=require&channel_binding=require",
+            "postgresql+asyncpg://u:p@ep-abc-123.sa-east-1.aws.neon.tech/cage?ssl=require",
+        ),
+        # El endpoint con pooler de Neon: ademas se apaga la cache de
+        # sentencias preparadas, o PgBouncer las mezcla entre sesiones.
+        (
+            "postgresql://u:p@ep-abc-123-pooler.sa-east-1.aws.neon.tech/cage?sslmode=require",
+            "postgresql+asyncpg://u:p@ep-abc-123-pooler.sa-east-1.aws.neon.tech/cage"
+            "?prepared_statement_cache_size=0&ssl=require",
+        ),
+        # Supabase marca el pooler de otra forma.
+        (
+            "postgres://u:p@db.supabase.co:6543/postgres?pgbouncer=true",
+            "postgresql+asyncpg://u:p@db.supabase.co:6543/postgres"
+            "?pgbouncer=true&prepared_statement_cache_size=0",
+        ),
+        # Fly, tras `attach`: sin parametros, red privada, sin TLS.
+        (
+            "postgres://cage:xyz@the-cage-db.flycast:5432/cage",
+            "postgresql+asyncpg://cage:xyz@the-cage-db.flycast:5432/cage",
+        ),
+        # Si ya viene bien escrito, no se toca.
+        (
+            "postgresql+asyncpg://u:p@h/d?ssl=require",
+            "postgresql+asyncpg://u:p@h/d?ssl=require",
+        ),
+        # SQLite se queda como esta.
+        ("sqlite+aiosqlite:///./cage.db", "sqlite+aiosqlite:///./cage.db"),
+    ],
+)
+def test_el_dsn_del_proveedor_se_traduce_a_asyncpg(crudo: str, esperado: str) -> None:
+    from app.core.config import Settings
+
+    ajustes = Settings(database_url=crudo, jwt_secret="x" * 40)
+    assert ajustes.database_url == esperado
+
+
+@pytest.mark.parametrize(
+    "sucio",
+    [
+        # Copiado a mano del panel de Neon, que lo muestra partido en dos.
+        "postgresql://u:p@ep-little-mountain-b59php65.c-7.us\n"
+        "-east-2.aws.neon.tech/neondb?sslmode=require",
+        "postgresql://u:p@ep-little-mountain-b59php65.c-7.us "
+        "-east-2.aws.neon.tech/neondb?sslmode=require",
+        # Con espacios alrededor, que es lo que deja un copiar-pegar apurado.
+        "  postgresql://u:p@ep-little-mountain-b59php65.c-7."
+        "us-east-2.aws.neon.tech/neondb?sslmode=require\n",
+    ],
+)
+def test_el_dsn_sobrevive_a_un_copiado_con_saltos_de_linea(sucio: str) -> None:
+    """Un salto de linea en medio del host rompe SQLAlchemy muy lejos de aqui.
+
+    El error que sale es `Could not parse SQLAlchemy URL from given URL string`
+    dentro de Alembic, sin ninguna pista de que el problema es un caracter
+    invisible en una variable de entorno.
+    """
+    from app.core.config import Settings
+
+    esperado = (
+        "postgresql+asyncpg://u:p@ep-little-mountain-b59php65.c-7."
+        "us-east-2.aws.neon.tech/neondb?ssl=require"
+    )
+    assert Settings(database_url=sucio, jwt_secret="x" * 40).database_url == esperado

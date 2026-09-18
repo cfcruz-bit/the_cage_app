@@ -28,8 +28,20 @@
     },
     "icon": "./assets/icon.png",
     "extra": {
-      "_comment": "Vacio = la app deduce la IP del servidor de Metro. Rellenar solo en produccion.",
-      "apiUrl": ""
+      "_comment": "apiUrl manda en las builds de produccion. En desarrollo gana la deteccion automatica de la IP de Metro, salvo que forceApiUrl sea true.",
+      "apiUrl": "https://the-cage-api.fly.dev",
+      "forceApiUrl": false,
+      "router": {},
+      "eas": {
+        "projectId": "908e3287-0166-4863-a185-68884f64862c"
+      }
+    },
+    "owner": "juggxrnaut",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/908e3287-0166-4863-a185-68884f64862c"
     }
   }
 }

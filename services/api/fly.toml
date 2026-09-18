@@ -3,12 +3,25 @@
 #   fly launch --no-deploy     (una sola vez, crea la app)
 #   fly deploy
 #
-# La region es Santiago de Chile: es la mas cercana a Nicaragua de las que Fly
-# ofrece en Sudamerica. Si notas latencia alta, `fly platform regions` lista
-# las disponibles y `mia` (Miami) suele ser buena alternativa desde Centroamerica.
+# La region es Ashburn, Virginia.
+#
+# Miami era la opcion obvia por cercania, pero Fly la retiro en 2026 junto con
+# otras 16 regiones: `fly deploy` responde "Region mia is deprecated and cannot
+# have new resources provisioned".
+#
+# De las que quedan, la eleccion no es por distancia a Nicaragua sino por
+# distancia a la base de datos. Neon vive en us-east-2 (Ohio) y cada peticion
+# de la API hace varias consultas, asi que esos viajes se multiplican mientras
+# que el del telefono ocurre una sola vez:
+#
+#   iad (Ashburn)  ~70 ms al telefono + ~15 ms por consulta
+#   dfw (Dallas)   ~55 ms al telefono + ~25 ms por consulta
+#
+# Con tres consultas por peticion iad ya gana, y con cinco gana por mucho.
+# `fly platform regions` lista las vigentes.
 
 app = "the-cage-api"
-primary_region = "scl"
+primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"

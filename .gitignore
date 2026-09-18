@@ -31,5 +31,18 @@ Thumbs.db
 *.db-shm
 *.db-wal
 
+# Firma de la app — NUNCA al repo
+#
+# credentials.json trae las contrasenas del keystore, y el .jks es la llave con
+# la que se firma el APK. Quien tenga las dos puede publicar una actualizacion
+# de The Cage que los telefonos instalarian como legitima, porque Android
+# identifica una app por su firma y no por su nombre.
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+
 # Temporales de vitest
 *.timestamp-*.mjs
