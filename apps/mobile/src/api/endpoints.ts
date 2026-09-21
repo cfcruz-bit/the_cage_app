@@ -16,6 +16,8 @@ import type {
   MesocycleIn,
   MesocycleOut,
   MesocycleSummaryOut,
+  OneRepMaxIn,
+  OneRepMaxOut,
   PlanGridOut,
   PrescriptionIn,
   PrescriptionOut,
@@ -189,6 +191,33 @@ export async function pushFeedback(
 export async function completeSession(sessionId: string): Promise<SessionOut> {
   return request<SessionOut>(`/sessions/${sessionId}/complete`, {
     method: 'POST',
+  });
+}
+
+// ── Marcas de fuerza (1RM) ──────────────────────────────────────────────────
+
+/** Vigentes por defecto; con `onlyCurrent: false` sale el historial completo. */
+export async function listRecords(
+  athleteId: string,
+  onlyCurrent = true,
+): Promise<OneRepMaxOut[]> {
+  const query = onlyCurrent ? '' : '?onlyCurrent=false';
+  return request<OneRepMaxOut[]>(`/athletes/${athleteId}/records${query}`);
+}
+
+export async function createRecord(
+  athleteId: string,
+  body: OneRepMaxIn,
+): Promise<OneRepMaxOut> {
+  return request<OneRepMaxOut>(`/athletes/${athleteId}/records`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export async function deleteRecord(athleteId: string, recordId: string): Promise<void> {
+  return request<void>(`/athletes/${athleteId}/records/${recordId}`, {
+    method: 'DELETE',
   });
 }
 

@@ -23,6 +23,7 @@ import { useAuth } from '@/stores/auth';
 import { Aggressiveness, POLICY_VERSION } from '@cage/engine';
 import { Screen } from '@/components/Screen';
 import { Chip } from '@/components/Chip';
+import { RecordsPanel } from '@/features/records/RecordsPanel';
 import { useSession } from '@/stores/session';
 import { color, radius, space } from '@/theme/tokens';
 import type { Unit } from '@/lib/units';
@@ -113,6 +114,12 @@ export default function SettingsScreen() {
                 />
               ))}
             </View>
+          </View>
+        ) : null}
+
+        {isAthlete && user !== null && user !== undefined ? (
+          <View style={styles.group}>
+            <RecordsPanel athleteId={user.id} canEdit={false} />
           </View>
         ) : null}
 

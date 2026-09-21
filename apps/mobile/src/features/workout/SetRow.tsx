@@ -19,9 +19,12 @@ import { Unit, formatNumber } from '@/lib/units';
 interface Props {
   index: number;
   unit: Unit;
-  /** Lo que manda el plan. */
-  targetWeightKg: number;
-  targetReps: number;
+  /**
+   * Lo que manda el plan. null cuando el ejercicio no tiene ningún peso
+   * todavía: no hay objetivo que proponer, el atleta registra el suyo.
+   */
+  targetWeightKg: number | null;
+  targetReps: number | null;
   why: string;
   /** Lo que el atleta reportó, si reportó algo distinto. */
   loggedWeightKg: number | null;
@@ -47,8 +50,10 @@ export const SetRow = memo(function SetRow({
   onToggle,
   onReport,
 }: Props) {
+  const hasTarget = targetWeightKg !== null && targetReps !== null;
   const loggedRepsN = loggedReps == null ? null : parseInt(loggedReps, 10);
   const deviated =
+    hasTarget &&
     done &&
     ((loggedWeightKg != null && Math.abs(loggedWeightKg - targetWeightKg) > 0.01) ||
       (loggedRepsN != null && loggedRepsN !== targetReps));
@@ -59,44 +64,61 @@ export const SetRow = memo(function SetRow({
         <Text style={styles.index}>{index + 1}</Text>
 
         <View style={styles.target}>
-          <Text style={[styles.prescription, done && !deviated && styles.prescriptionDone]}>
-            {formatNumber(targetWeightKg, unit)} {unit} × {targetReps}
-          </Text>
-
-          {deviated ? (
-            <Text style={styles.actual}>
-              hiciste {formatNumber(loggedWeightKg ?? targetWeightKg, unit)} {unit} ×{' '}
-              {loggedRepsN ?? targetReps}
+          {hasTarget ? (
+            <>
+              <Text style={[styles.prescription, done && !deviated && styles.prescriptionDone]}>
+                {formatNumber(targetWeightKg, unit)} {unit} × {targetReps}
+              </Text>
+              {deviated ? (
+                <Text style={styles.actual}>
+                  hiciste {formatNumber(loggedWeightKg ?? targetWeightKg, unit)} {unit} ×{' '}
+                  {loggedRepsN ?? targetReps}
+                </Text>
+              ) : null}
+            </>
+          ) : loggedWeightKg !== null ? (
+            <Text style={styles.prescription}>
+              {formatNumber(loggedWeightKg, unit)} {unit} × {loggedRepsN ?? '—'}
             </Text>
-          ) : null}
+          ) : (
+            <Text style={styles.noTarget}>— registrá tu peso</Text>
+          )}
         </View>
 
-        {done ? (
-          <Pressable
-            onPress={onReport}
-            accessibilityRole="button"
-            accessibilityLabel={`Corregir el set ${index + 1}`}
-            hitSlop={8}
-            style={({ pressed }) => [styles.report, pressed && styles.pressed]}
-          >
-            <Ionicons name="create-outline" size={15} color={color.textFaint} />
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={onReport}
-            accessibilityRole="button"
-            accessibilityLabel={`No pude con el set ${index + 1}`}
-            hitSlop={8}
-            style={({ pressed }) => [styles.report, pressed && styles.pressed]}
-          >
-            <Text style={styles.reportText}>no pude</Text>
-          </Pressable>
-        )}
+        {hasTarget ? (
+          done ? (
+            <Pressable
+              onPress={onReport}
+              accessibilityRole="button"
+              accessibilityLabel={`Corregir el set ${index + 1}`}
+              hitSlop={8}
+              style={({ pressed }) => [styles.report, pressed && styles.pressed]}
+            >
+              <Ionicons name="create-outline" size={15} color={color.textFaint} />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={onReport}
+              accessibilityRole="button"
+              accessibilityLabel={`No pude con el set ${index + 1}`}
+              hitSlop={8}
+              style={({ pressed }) => [styles.report, pressed && styles.pressed]}
+            >
+              <Text style={styles.reportText}>no pude</Text>
+            </Pressable>
+          )
+        ) : null}
 
         <Pressable
-          onPress={onToggle}
+          onPress={hasTarget ? onToggle : onReport}
           accessibilityRole="checkbox"
-          accessibilityLabel={done ? `Desmarcar set ${index + 1}` : `Marcar set ${index + 1} como hecho`}
+          accessibilityLabel={
+            hasTarget
+              ? done
+                ? `Desmarcar set ${index + 1}`
+                : `Marcar set ${index + 1} como hecho`
+              : `Registrar el set ${index + 1}`
+          }
           accessibilityState={{ checked: done }}
           hitSlop={8}
           style={({ pressed }) => [
@@ -148,6 +170,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   prescriptionDone: { color: color.textMuted },
+  noTarget: { color: color.textFaint, fontSize: 15, fontStyle: 'italic' },
   actual: { color: palette.a300, fontSize: 12, fontVariant: ['tabular-nums'] },
   report: { paddingHorizontal: 4, paddingVertical: 4 },
   reportText: { color: color.textFaint, fontSize: 11.5 },

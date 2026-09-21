@@ -3,14 +3,19 @@
  *
  * El prototipo tenía una sola pantalla —duración, objetivo y volumen por
  * músculo— porque no creaba nada de verdad. Para crear un mesociclo real hace
- * falta más: a quién, cuántas semanas, y con qué ejercicios y cargas de
- * arranque. Se reparte en pasos en vez de apilarlo todo, porque un formulario
- * de veinte campos en un teléfono se abandona.
+ * falta más: a quién, cuántas semanas, y con qué ejercicios. Se reparte en
+ * pasos en vez de apilarlo todo, porque un formulario de veinte campos en un
+ * teléfono se abandona.
  *
- * El paso 3 es el que importa y el que nadie puede adivinar por ti: **la carga
- * de arranque**. El motor necesita siempre un "la vez anterior" para calcular,
- * y en la semana 1 no lo hay. Ese número sale del test de cargas iniciales que
- * el coach hace con el atleta, y de ahí en adelante ya progresa solo.
+ * El paso 3 es el que nadie puede adivinar por ti: **la carga**. No hay ningún
+ * peso inventado -ni un arranque de 20 kg ni ningún otro-, así que la regla la
+ * pone el producto:
+ *
+ * - Un **básico** exige carga en TODAS las semanas, en kilos o en % del 1RM
+ *   del atleta: así se programa fuerza. El botón CREAR se apaga mientras
+ *   falte alguna.
+ * - Un **accesorio** se deja libre: el atleta registra lo primero que levante
+ *   y el motor progresa desde ahí, o el coach fija algo luego desde la tabla.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -34,9 +39,15 @@ import type {
   MesocycleExerciseIn,
   TrainingGoal,
   UserOut,
+  WeekLoadIn,
 } from '@/api/types';
 import { Chip } from '@/components/Chip';
+import { PlanGrid } from '@/features/mesos/PlanGrid';
+import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
+import { groupByMuscle, muscleLabel } from '@/lib/muscles';
 import { useRemote } from '@/lib/remote';
+import { type Unit, toDisplay } from '@/lib/units';
+import { useSession } from '@/stores/session';
 import { color, palette, radius, space } from '@/theme/tokens';
 
 const WEEKS = [4, 5, 6, 8] as const;
@@ -64,38 +75,6 @@ interface GoalPreset {
   sets: number;
   help: string;
 }
-
-/**
- * Los músculos en orden de pantalla.
- *
- * No alfabético: de arriba abajo del cuerpo, que es como un coach recorre un
- * plan y como estaba ordenado el prototipo.
- */
-const MUSCLE_ORDER = [
-  'CHEST',
-  'BACK',
-  'SHOULDERS',
-  'BICEPS',
-  'TRICEPS',
-  'QUADS',
-  'HAMSTRINGS',
-  'GLUTES',
-  'CALVES',
-  'ABS',
-] as const;
-
-const MUSCLE_LABEL: Record<string, string> = {
-  CHEST: 'Pecho',
-  BACK: 'Espalda',
-  SHOULDERS: 'Hombros',
-  BICEPS: 'Bíceps',
-  TRICEPS: 'Tríceps',
-  QUADS: 'Cuádriceps',
-  HAMSTRINGS: 'Isquiotibiales',
-  GLUTES: 'Glúteos',
-  CALVES: 'Gemelos',
-  ABS: 'Abdomen',
-};
 
 const GOAL_PRESET: Record<TrainingGoal, GoalPreset> = {
   fuerza: {
@@ -133,6 +112,26 @@ interface Draft extends MesocycleExerciseIn {
   muscle: string;
 }
 
+/**
+ * Semanas 1..totalWeeks sin carga (kg o %) todavía, solo para un BÁSICO.
+ *
+ * Es la misma regla que exige el servidor al crear: un accesorio no exige
+ * nada, así que siempre devuelve un array vacío para uno.
+ */
+function missingWeeksFor(draft: Draft, totalWeeks: number): number[] {
+  if (draft.muscle !== 'BASICOS') return [];
+  const covered = new Set(
+    draft.weeks
+      .filter((w) => w.loadKg !== null || w.loadPercent !== null)
+      .map((w) => w.weekNumber),
+  );
+  const missing: number[] = [];
+  for (let w = 1; w <= totalWeeks; w += 1) {
+    if (!covered.has(w)) missing.push(w);
+  }
+  return missing;
+}
+
 type Step = 1 | 2 | 3;
 
 export function NewMesoSheet({
@@ -140,16 +139,24 @@ export function NewMesoSheet({
   athletes,
   onClose,
   onCreated,
+  onSaved,
 }: {
   visible: boolean;
   athletes: UserOut[];
   onClose: () => void;
+  /** Se creó (vía CREAR) y el sheet se cierra: hay que refrescar la lista. */
   onCreated: () => void;
+  /**
+   * Se creó (vía PAUTAR SEMANAS) pero el sheet se queda abierto: solo hay que
+   * refrescar la lista de fondo, sin cerrar nada.
+   */
+  onSaved?: () => void;
 }) {
   const catalog = useRemote<ExerciseCatalogOut[]>(
     useCallback(() => listExercises(), []),
     [],
   );
+  const unit = useSession((s) => s.unit);
 
   const [step, setStep] = useState<Step>(1);
   const [athleteId, setAthleteId] = useState<string | null>(null);
@@ -159,8 +166,11 @@ export function NewMesoSheet({
   const [goal, setGoal] = useState<TrainingGoal>('hipertrofia');
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'crear' | 'pautar' | null>(null);
+  const busy = pendingAction !== null;
   const [error, setError] = useState<string | null>(null);
+  /** No-null cuando ya se creó y el sheet se queda abierto para pautar. */
+  const [createdMesoId, setCreatedMesoId] = useState<string | null>(null);
 
   const chosen = useMemo(
     () => new Set(drafts.map((d) => d.catalogId)),
@@ -187,29 +197,11 @@ export function NewMesoSheet({
         : items.filter(
             (e) =>
               e.name.toLowerCase().includes(needle) ||
-              (MUSCLE_LABEL[e.muscle] ?? e.muscle).toLowerCase().includes(needle) ||
+              muscleLabel(e.muscle).toLowerCase().includes(needle) ||
               e.equipment.toLowerCase().includes(needle),
           );
 
-    const byMuscle = new Map<string, ExerciseCatalogOut[]>();
-    for (const item of matching) {
-      const bucket = byMuscle.get(item.muscle);
-      if (bucket === undefined) byMuscle.set(item.muscle, [item]);
-      else bucket.push(item);
-    }
-
-    const known = MUSCLE_ORDER.filter((m) => byMuscle.has(m));
-    // Un músculo que el servidor conozca y esta app no, al final en vez de
-    // desaparecido: un ejercicio invisible es peor que uno mal ordenado.
-    const unknown = [...byMuscle.keys()]
-      .filter((m) => !MUSCLE_ORDER.includes(m as (typeof MUSCLE_ORDER)[number]))
-      .sort();
-
-    return [...known, ...unknown].map((muscle) => ({
-      muscle,
-      label: MUSCLE_LABEL[muscle] ?? muscle,
-      items: byMuscle.get(muscle) ?? [],
-    }));
+    return groupByMuscle(matching);
   }, [catalog.data, query]);
 
   const totalVisible = useMemo(
@@ -227,6 +219,7 @@ export function NewMesoSheet({
     setDrafts([]);
     setQuery('');
     setError(null);
+    setCreatedMesoId(null);
   }
 
   function close() {
@@ -252,11 +245,13 @@ export function NewMesoSheet({
           repHi: preset.repHi,
           targetRir: preset.targetRir,
           loadIncrementKg: item.loadIncrementKg,
-          // Arranque neutro. El coach lo corrige en el paso 3; es el único
-          // número que no se puede deducir de nada.
-          startingLoadKg: 20,
+          // Sin arranque inventado: null hasta que el paso 3 diga lo
+          // contrario. Un básico lo exige por semana; un accesorio se deja
+          // libre y el atleta registra lo primero que levante.
+          startingLoadKg: null,
           startingReps: Math.round((preset.repLo + preset.repHi) / 2),
           startingSets: preset.sets,
+          weeks: [],
         },
       ];
     });
@@ -268,13 +263,18 @@ export function NewMesoSheet({
     );
   }
 
-  async function submit() {
+  /**
+   * CREAR cierra el sheet. PAUTAR SEMANAS lo deja abierto y, en cuanto el
+   * servidor responde, muestra la tabla del mesociclo recién creado: cerrar
+   * después no pierde nada, porque ya está todo guardado (bloque 6).
+   */
+  async function submit(thenPautar: boolean) {
     if (athleteId === null || drafts.length === 0 || busy) return;
 
-    setBusy(true);
+    setPendingAction(thenPautar ? 'pautar' : 'crear');
     setError(null);
     try {
-      await createMesocycle({
+      const meso = await createMesocycle({
         athleteId,
         name: name.trim() || 'Mesociclo',
         totalWeeks: weeks,
@@ -282,8 +282,13 @@ export function NewMesoSheet({
         goal,
         exercises: drafts.map(({ name: _n, muscle: _m, ...rest }) => rest),
       });
-      reset();
-      onCreated();
+      if (thenPautar) {
+        setCreatedMesoId(meso.id);
+        onSaved?.();
+      } else {
+        reset();
+        onCreated();
+      }
     } catch (e) {
       setError(
         e instanceof ApiError
@@ -293,12 +298,16 @@ export function NewMesoSheet({
           : 'No se pudo crear.',
       );
     } finally {
-      setBusy(false);
+      setPendingAction(null);
     }
   }
 
   const canAdvance =
-    step === 1 ? athleteId !== null : step === 2 ? drafts.length > 0 : true;
+    step === 1
+      ? athleteId !== null
+      : step === 2
+        ? drafts.length > 0
+        : drafts.every((d) => missingWeeksFor(d, weeks).length === 0);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
@@ -307,14 +316,26 @@ export function NewMesoSheet({
       <View style={styles.sheet}>
         <View style={styles.head}>
           <View style={styles.headText}>
-            <Text style={styles.title}>NUEVO MESOCICLO</Text>
-            <Text style={styles.subtitle}>{SUBTITLES[step]}</Text>
+            <Text style={styles.title}>
+              {createdMesoId !== null ? 'PAUTAR SEMANAS' : 'NUEVO MESOCICLO'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {createdMesoId !== null
+                ? 'Ya está creado. Ajustá lo que quieras; cerrar no pierde nada.'
+                : SUBTITLES[step]}
+            </Text>
           </View>
           <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Cerrar" hitSlop={10}>
             <Ionicons name="close" size={19} color={color.textMuted} />
           </Pressable>
         </View>
 
+        {createdMesoId !== null ? (
+          <ScrollView contentContainerStyle={styles.body}>
+            <PlanGrid mesocycleId={createdMesoId} />
+          </ScrollView>
+        ) : (
+          <>
         <View style={styles.steps}>
           {[1, 2, 3].map((n) => (
             <View key={n} style={[styles.stepDot, n <= step && styles.stepDotOn]} />
@@ -463,37 +484,62 @@ export function NewMesoSheet({
           {step === 3 ? (
             <>
               <Text style={styles.help}>
-                La carga de arranque es la de la semana 1. El motor la necesita
-                para tener un punto de partida; a partir de ahí progresa con el
-                RIR y el feedback del atleta.
+                Los básicos exigen carga en TODAS las semanas —en kilos o en %
+                del 1RM del atleta—, porque así se programa fuerza. Los
+                accesorios quedan libres: el atleta registra lo que levante y
+                el motor progresa desde ahí, o los fijás luego desde la tabla.
               </Text>
 
-              {drafts.map((d) => (
-                <View key={d.catalogId} style={styles.draft}>
-                  <Text style={styles.rowName}>{d.name}</Text>
-                  <Text style={styles.rowMeta}>
-                    {d.muscle} · {d.repLo}–{d.repHi} reps · RIR {d.targetRir}
-                  </Text>
+              {drafts.map((d) => {
+                const missing = missingWeeksFor(d, weeks);
+                const isBasico = d.muscle === 'BASICOS';
+                return (
+                  <View key={d.catalogId} style={styles.draft}>
+                    <Text style={styles.rowName}>{d.name}</Text>
+                    <Text style={styles.rowMeta}>
+                      {muscleLabel(d.muscle)} · {d.repLo}–{d.repHi} reps · RIR{' '}
+                      {d.targetRir}
+                    </Text>
 
-                  <View style={styles.fields}>
-                    <NumberField
-                      label="CARGA KG"
-                      value={d.startingLoadKg}
-                      onChange={(v) => patch(d.catalogId, { startingLoadKg: v })}
-                    />
-                    <NumberField
-                      label="REPS"
-                      value={d.startingReps}
-                      onChange={(v) => patch(d.catalogId, { startingReps: v })}
-                    />
-                    <NumberField
-                      label="SETS"
-                      value={d.startingSets}
-                      onChange={(v) => patch(d.catalogId, { startingSets: v })}
-                    />
+                    <View style={styles.fields}>
+                      <NumberField
+                        label="REPS"
+                        value={d.startingReps}
+                        onChange={(v) => patch(d.catalogId, { startingReps: v })}
+                      />
+                      <NumberField
+                        label="SETS"
+                        value={d.startingSets}
+                        onChange={(v) => patch(d.catalogId, { startingSets: v })}
+                      />
+                    </View>
+
+                    {isBasico ? (
+                      <>
+                        <Text style={styles.weekGridLabel}>
+                          CARGA POR SEMANA (% o KG)
+                        </Text>
+                        <WeekLoadGrid
+                          totalWeeks={weeks}
+                          weeks={d.weeks}
+                          unit={unit}
+                          onChange={(next) => patch(d.catalogId, { weeks: next })}
+                        />
+                        {missing.length > 0 ? (
+                          <Text style={styles.error}>
+                            Falta la carga de la semana{missing.length > 1 ? 's' : ''}{' '}
+                            {missing.join(', ')}.
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text style={styles.help}>
+                        Sin carga de arranque: es un accesorio.
+                      </Text>
+                    )}
                   </View>
-                </View>
-              ))}
+                );
+              })}
 
               {error !== null ? <Text style={styles.error}>{error}</Text> : null}
             </>
@@ -511,28 +557,58 @@ export function NewMesoSheet({
             </Pressable>
           ) : null}
 
-          <Pressable
-            onPress={() => {
-              if (step < 3) setStep((s) => (s + 1) as Step);
-              else void submit();
-            }}
-            disabled={!canAdvance || busy}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.primary,
-              (!canAdvance || busy) && styles.off,
-              pressed && canAdvance && !busy && styles.primaryPressed,
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={color.onAccent} />
-            ) : (
-              <Text style={styles.primaryText}>
-                {step < 3 ? 'SIGUIENTE' : 'CREAR'}
-              </Text>
-            )}
-          </Pressable>
+          {step < 3 ? (
+            <Pressable
+              onPress={() => setStep((s) => (s + 1) as Step)}
+              disabled={!canAdvance}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.primary,
+                !canAdvance && styles.off,
+                pressed && canAdvance && styles.primaryPressed,
+              ]}
+            >
+              <Text style={styles.primaryText}>SIGUIENTE</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Pressable
+                onPress={() => void submit(false)}
+                disabled={!canAdvance || busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.secondary,
+                  (!canAdvance || busy) && styles.off,
+                  pressed && canAdvance && !busy && { opacity: 0.7 },
+                ]}
+              >
+                {pendingAction === 'crear' ? (
+                  <ActivityIndicator color={color.textMuted} />
+                ) : (
+                  <Text style={styles.secondaryText}>CREAR</Text>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={() => void submit(true)}
+                disabled={!canAdvance || busy}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.primary,
+                  (!canAdvance || busy) && styles.off,
+                  pressed && canAdvance && !busy && styles.primaryPressed,
+                ]}
+              >
+                {pendingAction === 'pautar' ? (
+                  <ActivityIndicator color={color.onAccent} />
+                ) : (
+                  <Text style={styles.primaryText}>PAUTAR SEMANAS</Text>
+                )}
+              </Pressable>
+            </>
+          )}
         </View>
+          </>
+        )}
       </View>
     </Modal>
   );
@@ -579,6 +655,95 @@ function NumberField({
         selectTextOnFocus
         accessibilityLabel={label}
       />
+    </View>
+  );
+}
+
+/**
+ * Una fila por semana con un campo de carga que acepta % o kilos.
+ *
+ * El texto crudo se guarda aparte, igual que en `NumberField`: mientras se
+ * escribe "102,5" no hay que perder la coma a cada tecla. Se parsea y se sube
+ * al draft al salir del campo, con `parseLoadInput` — el mismo que valida la
+ * celda de `PlanGrid.tsx`.
+ */
+function WeekLoadGrid({
+  totalWeeks,
+  weeks,
+  unit,
+  onChange,
+}: {
+  totalWeeks: number;
+  weeks: WeekLoadIn[];
+  unit: Unit;
+  onChange: (weeks: WeekLoadIn[]) => void;
+}) {
+  const [texts, setTexts] = useState<Record<number, string>>({});
+  const [errors, setErrors] = useState<Record<number, string>>({});
+
+  function textFor(week: number): string {
+    const typed = texts[week];
+    if (typed !== undefined) return typed;
+    const saved = weeks.find((w) => w.weekNumber === week);
+    if (saved === undefined) return '';
+    if (saved.loadPercent !== null) return `${saved.loadPercent}%`;
+    if (saved.loadKg !== null) return String(toDisplay(saved.loadKg, unit));
+    return '';
+  }
+
+  function commit(week: number) {
+    const text = textFor(week);
+    const parsed: ParsedLoad = parseLoadInput(text, unit);
+
+    if (parsed.kind === 'invalid') {
+      setErrors((current) => ({ ...current, [week]: parsed.reason }));
+      return;
+    }
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[week];
+      return next;
+    });
+
+    const rest = weeks.filter((w) => w.weekNumber !== week);
+    onChange(
+      parsed.kind === 'empty'
+        ? rest
+        : [
+            ...rest,
+            {
+              weekNumber: week,
+              loadKg: parsed.kind === 'kg' ? parsed.value : null,
+              loadPercent: parsed.kind === 'percent' ? parsed.value : null,
+              sets: null,
+              repLo: null,
+              repHi: null,
+              targetRir: null,
+            },
+          ],
+    );
+  }
+
+  return (
+    <View style={styles.weekGrid}>
+      {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
+        const hasError = errors[week] !== undefined;
+        return (
+          <View key={week} style={styles.weekCell}>
+            <Text style={styles.weekLabel}>S{week}</Text>
+            <TextInput
+              style={[styles.weekInput, hasError && styles.weekInputError]}
+              value={textFor(week)}
+              onChangeText={(t) => setTexts((current) => ({ ...current, [week]: t }))}
+              onBlur={() => commit(week)}
+              placeholder="75% / kg"
+              placeholderTextColor={color.textFaint}
+              autoCapitalize="none"
+              accessibilityLabel={`Carga de la semana ${week}`}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -677,6 +842,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
+
+  weekGridLabel: {
+    color: color.textFaint,
+    fontSize: 9.5,
+    letterSpacing: 1.4,
+    marginTop: space.sm,
+  },
+  weekGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 4 },
+  weekCell: { width: 62, gap: 3 },
+  weekLabel: { color: color.textFaint, fontSize: 9.5, textAlign: 'center' },
+  weekInput: {
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: palette.n900,
+    color: color.text,
+    fontSize: 13,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    borderRadius: radius.chip,
+    textAlign: 'center',
+  },
+  weekInputError: { borderColor: color.accent },
 
   footer: {
     flexDirection: 'row',

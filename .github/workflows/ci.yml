@@ -49,7 +49,9 @@ jobs:
       # `npm ci` en la raíz instala los tres workspaces de una vez.
       - run: npm ci
 
-      - name: Tests del motor
+      # `npm test` en la raíz corre el motor (vitest sobre golden/cases.json)
+      # y, desde el bloque 5, `src/lib/**/*.test.ts` de la app móvil.
+      - name: Tests
         run: npm test
 
       # Typecheck del motor y de la app móvil. Requiere que las dependencias de

@@ -31,10 +31,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiError } from '@/api/client';
 import { planGrid, setPrescription } from '@/api/endpoints';
 import type { PlanCellOut, PlanGridOut, PlanRowOut } from '@/api/types';
+import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
 import { useRemote } from '@/lib/remote';
-import { formatNumber } from '@/lib/units';
+import { type Unit, formatNumber } from '@/lib/units';
 import { useSession } from '@/stores/session';
 import { color, palette, radius, space } from '@/theme/tokens';
+
+/** "75% · 105 kg" | "75% · sin marca" | "105 kg" | "—". */
+function loadText(cell: PlanCellOut, unit: Unit): string {
+  if (cell.loadPercent !== null) {
+    const pct = `${trimPct(cell.loadPercent)}%`;
+    if (cell.loadKg !== null) return `${pct} · ${formatNumber(cell.loadKg, unit)} kg`;
+    return `${pct} · sin marca`;
+  }
+  if (cell.loadKg !== null) return formatNumber(cell.loadKg, unit);
+  return '—';
+}
+
+function trimPct(v: number): string {
+  return String(Math.round(v * 10) / 10);
+}
 
 export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
   const remote = useRemote<PlanGridOut>(
@@ -103,36 +119,45 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
                 <Text style={[styles.cell, styles.headText]}>RIR</Text>
               </View>
 
-              {row.weeks.map((cell) => (
-                <Pressable
-                  key={cell.weekNumber}
-                  onPress={() => setEditing({ row, cell })}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Pautar ${row.name}, semana ${cell.weekNumber}`}
-                  style={({ pressed }) => [
-                    styles.row,
-                    cell.isDeload && styles.rowDeload,
-                    cell.weekNumber === grid.currentWeekIndex + 1 && styles.rowNow,
-                    pressed && { opacity: 0.6 },
-                  ]}
-                >
-                  <Text style={[styles.cell, styles.cellWeek]}>
-                    {cell.isDeload ? 'DL' : `s${cell.weekNumber}`}
-                  </Text>
-                  <Value text={String(cell.sets)} pinned={cell.setsOverridden} />
-                  <Value
-                    wide
-                    text={cell.repLo === cell.repHi ? `${cell.repLo}` : `${cell.repLo}–${cell.repHi}`}
-                    pinned={cell.repsOverridden}
-                  />
-                  <Value
-                    wide
-                    text={formatNumber(cell.loadKg, unit)}
-                    pinned={cell.loadOverridden}
-                  />
-                  <Value text={String(cell.targetRir)} pinned={cell.rirOverridden} />
-                </Pressable>
-              ))}
+              {row.weeks.map((cell) => {
+                // Un básico exige carga en cada semana; si falta, es un hueco
+                // que hay que llenar, no un "automático" normal.
+                const missing = row.muscle === 'BASICOS' && cell.loadKg === null;
+                return (
+                  <Pressable
+                    key={cell.weekNumber}
+                    onPress={() => setEditing({ row, cell })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Pautar ${row.name}, semana ${cell.weekNumber}`}
+                    style={({ pressed }) => [
+                      styles.row,
+                      cell.isDeload && styles.rowDeload,
+                      cell.weekNumber === grid.currentWeekIndex + 1 && styles.rowNow,
+                      pressed && { opacity: 0.6 },
+                    ]}
+                  >
+                    <Text style={[styles.cell, styles.cellWeek]}>
+                      {cell.isDeload ? 'DL' : `s${cell.weekNumber}`}
+                    </Text>
+                    <Value text={String(cell.sets)} pinned={cell.setsOverridden} />
+                    <Value
+                      wide
+                      text={
+                        cell.repLo === cell.repHi ? `${cell.repLo}` : `${cell.repLo}–${cell.repHi}`
+                      }
+                      pinned={cell.repsOverridden}
+                    />
+                    <Value
+                      wide
+                      text={loadText(cell, unit)}
+                      pinned={cell.loadOverridden}
+                      warn={cell.needsOneRm}
+                      error={missing}
+                    />
+                    <Value text={String(cell.targetRir)} pinned={cell.rirOverridden} />
+                  </Pressable>
+                );
+              })}
             </View>
           </ScrollView>
         </View>
@@ -143,6 +168,7 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
           mesocycleId={mesocycleId}
           row={editing.row}
           cell={editing.cell}
+          unit={unit}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -159,14 +185,36 @@ function Value({
   text,
   pinned,
   wide = false,
+  warn = false,
+  error = false,
 }: {
   text: string;
   pinned: boolean;
   wide?: boolean;
+  /** % sin marca: se puede resolver en cuanto exista una. */
+  warn?: boolean;
+  /** Básico sin carga: es obligatoria y falta. */
+  error?: boolean;
 }) {
   return (
-    <View style={[styles.cell, wide && styles.cellWide, styles.valueBox]}>
-      <Text style={[styles.value, pinned && styles.valuePinned]}>{text}</Text>
+    <View
+      style={[
+        styles.cell,
+        wide && styles.cellWide,
+        styles.valueBox,
+        error && styles.valueBoxError,
+      ]}
+    >
+      <Text
+        style={[
+          styles.value,
+          pinned && styles.valuePinned,
+          warn && styles.valueWarn,
+          error && styles.valueError,
+        ]}
+      >
+        {text}
+      </Text>
       {pinned ? <View style={styles.pin} /> : null}
     </View>
   );
@@ -174,23 +222,31 @@ function Value({
 
 /* ── Editar una celda ─────────────────────────────────────────────────────── */
 
+/** El texto que ve el coach al abrir la celda: "75%", "105", o vacío. */
+function loadFieldSeed(cell: PlanCellOut): string {
+  if (!cell.loadOverridden) return '';
+  if (cell.loadPercent !== null) return `${trimPct(cell.loadPercent)}%`;
+  if (cell.loadKg !== null) return String(cell.loadKg);
+  return '';
+}
+
 function CellSheet({
   mesocycleId,
   row,
   cell,
+  unit,
   onClose,
   onSaved,
 }: {
   mesocycleId: string;
   row: PlanRowOut;
   cell: PlanCellOut;
+  unit: Unit;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [sets, setSets] = useState(cell.setsOverridden ? String(cell.sets) : '');
-  const [loadKg, setLoadKg] = useState(
-    cell.loadOverridden ? String(cell.loadKg) : '',
-  );
+  const [load, setLoad] = useState(loadFieldSeed(cell));
   const [repLo, setRepLo] = useState(cell.repsOverridden ? String(cell.repLo) : '');
   const [repHi, setRepHi] = useState(cell.repsOverridden ? String(cell.repHi) : '');
   const [rir, setRir] = useState(cell.rirOverridden ? String(cell.targetRir) : '');
@@ -212,13 +268,20 @@ function CellSheet({
       return;
     }
 
+    const parsed: ParsedLoad = parseLoadInput(load, unit);
+    if (parsed.kind === 'invalid') {
+      setError(parsed.reason);
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
       await setPrescription(mesocycleId, row.mesocycleExerciseId, {
         weekNumber: cell.weekNumber,
         sets: numberOrNull(sets),
-        loadKg: numberOrNull(loadKg),
+        loadKg: parsed.kind === 'kg' ? parsed.value : null,
+        loadPercent: parsed.kind === 'percent' ? parsed.value : null,
         repLo: lo,
         repHi: hi,
         targetRir: numberOrNull(rir),
@@ -264,10 +327,10 @@ function CellSheet({
           <View style={styles.fields}>
             <Field label="SETS" value={sets} onChange={setSets} auto={String(cell.sets)} />
             <Field
-              label="CARGA KG"
-              value={loadKg}
-              onChange={setLoadKg}
-              auto={String(cell.loadKg)}
+              label="CARGA (% o KG)"
+              value={load}
+              onChange={setLoad}
+              auto={cell.loadKg === null ? '—' : String(cell.loadKg)}
             />
             <Field label="RIR" value={rir} onChange={setRir} auto={String(cell.targetRir)} />
           </View>
@@ -289,7 +352,7 @@ function CellSheet({
           <Pressable
             onPress={() => {
               setSets('');
-              setLoadKg('');
+              setLoad('');
               setRepLo('');
               setRepHi('');
               setRir('');
@@ -399,8 +462,13 @@ const styles = StyleSheet.create({
   cellWide: { width: 78 },
 
   valueBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  valueBoxError: { borderWidth: 1, borderColor: color.accent, borderRadius: radius.chip },
   value: { color: color.textMuted, fontSize: 12.5, fontVariant: ['tabular-nums'] },
   valuePinned: { color: color.text, fontWeight: '600' },
+  /** % sin marca todavía: se puede resolver en cuanto exista una. */
+  valueWarn: { color: color.danger },
+  /** Básico sin carga: es obligatoria y falta. */
+  valueError: { color: color.accent, fontWeight: '600' },
   /** Marca de "esto lo puse yo". Un punto, no un color: el color ya lo usa la
    *  semana en curso y dos significados en el mismo canal se confunden. */
   pin: { width: 4, height: 4, borderRadius: 2, backgroundColor: color.accent },

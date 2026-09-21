@@ -23,8 +23,8 @@ import { color, palette, radius, space } from '@/theme/tokens';
 
 interface ResolvedSet {
   index: number;
-  targetWeightKg: number;
-  targetReps: number;
+  targetWeightKg: number | null;
+  targetReps: number | null;
   why: string;
   loggedWeightKg: number | null;
   loggedReps: string | null;
@@ -72,7 +72,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
       <View style={styles.targets}>
         <Text style={styles.target}>
-          {formatLoad(exercise.plannedLoadKg, unit)} · {exercise.plannedSets} sets
+          {exercise.plannedLoadKg === null
+            ? 'Sin carga todavía'
+            : formatLoad(exercise.plannedLoadKg, unit)}{' '}
+          · {exercise.plannedSets} sets
         </Text>
         <Text style={styles.target}>
           descanso {formatRest(exercise.restSeconds)}

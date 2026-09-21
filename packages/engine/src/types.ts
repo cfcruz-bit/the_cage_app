@@ -6,8 +6,17 @@
  * render, nunca aquí ni en la persistencia. (Ver docs/engine-contract.md)
  */
 
-/** Grupo muscular principal de un ejercicio. */
+/**
+ * Grupo muscular principal de un ejercicio.
+ *
+ * `Basicos` no es un músculo: son los tres movimientos de competición y sus
+ * variantes, que el coach programa como bloque propio. El motor no distingue
+ * por grupo -este campo es una etiqueta de presentación, nunca una rama de
+ * cálculo-, así que el valor solo necesita existir aquí para que `Exercise`
+ * pueda representarlo sin recurrir a un `as` que apague el chequeo de tipos.
+ */
 export const MuscleGroup = {
+  Basicos: 'BASICOS',
   Chest: 'CHEST',
   Back: 'BACK',
   Shoulders: 'SHOULDERS',

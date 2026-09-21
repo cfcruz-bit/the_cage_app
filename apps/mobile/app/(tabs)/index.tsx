@@ -101,9 +101,13 @@ export default function WorkoutScreen() {
         total += 1;
         if (s.done) {
           done += 1;
+          // Sin ningún peso -ni registrado, ni planificado- no hay nada que
+          // sumar al tonelaje: inventar un cero sería mentir sobre el volumen.
           const kg = s.loggedWeightKg ?? s.targetWeightKg;
-          const reps = Number.parseInt(s.loggedReps ?? '', 10);
-          volumeKg += kg * (Number.isFinite(reps) ? reps : s.targetReps);
+          if (kg !== null) {
+            const reps = Number.parseInt(s.loggedReps ?? '', 10);
+            volumeKg += kg * (Number.isFinite(reps) ? reps : (s.targetReps ?? 0));
+          }
         } else if (firstPending === null) {
           firstPending = { exerciseId: exercise.id, index: s.index };
         }
@@ -245,7 +249,11 @@ export default function WorkoutScreen() {
             }
             onToggle={(index) => {
               const s = sets.find((x) => x.index === index);
-              if (s === undefined) return;
+              // Sin objetivo no hay nada que asumir al tocar el check: ese
+              // caso lo resuelve SetRow abriendo el reporte, no este callback.
+              if (s === undefined || s.targetWeightKg === null || s.targetReps === null) {
+                return;
+              }
               onToggle(exercise.id, exercise.restSeconds)(
                 index,
                 s.targetWeightKg,

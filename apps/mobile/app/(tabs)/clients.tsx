@@ -33,6 +33,7 @@ import type {
   SessionStatus,
 } from '@/api/types';
 import { Screen } from '@/components/Screen';
+import { RecordsPanel } from '@/features/records/RecordsPanel';
 import { useRemote } from '@/lib/remote';
 import { color, palette, radius, space } from '@/theme/tokens';
 
@@ -323,6 +324,8 @@ function ClientDetail({ id, onBack }: { id: string; onBack: () => void }) {
             </View>
           </ScrollView>
         ) : null}
+
+        <RecordsPanel athleteId={id} canEdit />
 
         <Text style={styles.sectionLabel}>ÚLTIMAS SESIONES</Text>
 

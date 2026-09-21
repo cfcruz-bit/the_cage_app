@@ -141,6 +141,7 @@ function CoachList({ onOpen }: { onOpen: (id: string) => void }) {
           setCreating(false);
           mesos.reload();
         }}
+        onSaved={() => mesos.reload()}
       />
     </Screen>
   );
@@ -210,6 +211,14 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
   const projections = useMemo(() => {
     if (meso === null) return [];
     return meso.exercises.map((mex) => {
+      // Sin ningún peso de arranque el motor no tiene de dónde partir -no
+      // inventa un "última vez"-, así que no hay previsión local que calcular
+      // para este ejercicio. La tabla autorizada, con porcentajes resueltos
+      // contra la marca del atleta, es la pestaña PAUTAR.
+      if (mex.startingLoadKg === null) {
+        return { id: mex.id, name: mex.name, muscle: mex.muscle, exercise: null, weeks: [] };
+      }
+
       const exercise: Exercise = {
         id: mex.id,
         name: mex.name,
@@ -234,6 +243,9 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
       };
 
       return {
+        id: mex.id,
+        name: mex.name,
+        muscle: mex.muscle,
         exercise,
         weeks: projectMesocycle(exercise, planExercise(exercise, meso.aggressiveness), {
           totalWeeks: meso.totalWeeks,
@@ -327,40 +339,50 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
 
         <Text style={styles.sectionLabel}>PROGRESIÓN POR EJERCICIO</Text>
 
-        {projections.map(({ exercise, weeks }) => (
-          <View key={exercise.id} style={styles.card}>
-            <Text style={styles.name}>{exercise.name}</Text>
-            <Text style={styles.muscle}>{exercise.muscle}</Text>
+        {projections.map(({ id, name, muscle, weeks }) => (
+          <View key={id} style={styles.card}>
+            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.muscle}>{muscle}</Text>
 
-            <View style={styles.tableHead}>
-              <Text style={[styles.cell, styles.cellWeek, styles.headText]}>Sem</Text>
-              <Text style={[styles.cell, styles.headText]}>Sets</Text>
-              <Text style={[styles.cell, styles.cellWide, styles.headText]}>Reps</Text>
-              <Text style={[styles.cell, styles.cellWide, styles.headText]}>Carga</Text>
-              <Text style={[styles.cell, styles.headText]}>RIR</Text>
-            </View>
-
-            {weeks.map((w) => {
-              const isNow = w.index === current;
-              return (
-                <View
-                  key={w.index}
-                  style={[styles.row, isNow && styles.rowNow, w.isDeload && styles.rowDeload]}
-                >
-                  <Text style={[styles.cell, styles.cellWeek, isNow && styles.textNow]}>
-                    {w.isDeload ? 'DL' : `s${w.weekNumber}`}
-                  </Text>
-                  <Text style={[styles.cell, isNow && styles.textNow]}>{w.sets}</Text>
-                  <Text style={[styles.cell, styles.cellWide, isNow && styles.textNow]}>
-                    {w.repLo === w.repHi ? w.repLo : `${w.repLo}–${w.repHi}`}
-                  </Text>
-                  <Text style={[styles.cell, styles.cellWide, isNow && styles.textNow]}>
-                    {formatNumber(w.loadKg, unit)}
-                  </Text>
-                  <Text style={[styles.cell, isNow && styles.textNow]}>{w.targetRir}</Text>
+            {weeks.length === 0 ? (
+              <Text style={styles.footnote}>
+                Sin peso de arranque todavía: registrá uno para ver la
+                previsión acá. La tabla autorizada (con % resueltos) es
+                PAUTAR.
+              </Text>
+            ) : (
+              <>
+                <View style={styles.tableHead}>
+                  <Text style={[styles.cell, styles.cellWeek, styles.headText]}>Sem</Text>
+                  <Text style={[styles.cell, styles.headText]}>Sets</Text>
+                  <Text style={[styles.cell, styles.cellWide, styles.headText]}>Reps</Text>
+                  <Text style={[styles.cell, styles.cellWide, styles.headText]}>Carga</Text>
+                  <Text style={[styles.cell, styles.headText]}>RIR</Text>
                 </View>
-              );
-            })}
+
+                {weeks.map((w) => {
+                  const isNow = w.index === current;
+                  return (
+                    <View
+                      key={w.index}
+                      style={[styles.row, isNow && styles.rowNow, w.isDeload && styles.rowDeload]}
+                    >
+                      <Text style={[styles.cell, styles.cellWeek, isNow && styles.textNow]}>
+                        {w.isDeload ? 'DL' : `s${w.weekNumber}`}
+                      </Text>
+                      <Text style={[styles.cell, isNow && styles.textNow]}>{w.sets}</Text>
+                      <Text style={[styles.cell, styles.cellWide, isNow && styles.textNow]}>
+                        {w.repLo === w.repHi ? w.repLo : `${w.repLo}–${w.repHi}`}
+                      </Text>
+                      <Text style={[styles.cell, styles.cellWide, isNow && styles.textNow]}>
+                        {formatNumber(w.loadKg, unit)}
+                      </Text>
+                      <Text style={[styles.cell, isNow && styles.textNow]}>{w.targetRir}</Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
           </View>
         ))}
 

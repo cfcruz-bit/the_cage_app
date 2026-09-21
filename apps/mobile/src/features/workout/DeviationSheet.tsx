@@ -15,8 +15,9 @@ export interface DeviationTarget {
   exerciseId: string;
   exerciseName: string;
   index: number;
-  targetWeightKg: number;
-  targetReps: number;
+  /** null cuando el ejercicio no tiene ningún peso pautado todavía. */
+  targetWeightKg: number | null;
+  targetReps: number | null;
   loggedWeightKg: number | null;
   loggedReps: string | null;
 }
@@ -39,8 +40,8 @@ export function DeviationSheet({ target, unit, onSave, onReset, onClose }: Props
     if (!target) return;
     const startKg = target.loggedWeightKg ?? target.targetWeightKg;
     const startReps = parseInt(target.loggedReps ?? '', 10);
-    setWeightText(formatNumber(startKg, unit));
-    setReps(Number.isFinite(startReps) ? startReps : target.targetReps);
+    setWeightText(startKg === null ? '' : formatNumber(startKg, unit));
+    setReps(Number.isFinite(startReps) ? startReps : (target.targetReps ?? 0));
     setError(false);
   }, [target, unit]);
 
@@ -70,7 +71,11 @@ export function DeviationSheet({ target, unit, onSave, onReset, onClose }: Props
           <View style={styles.prescribed}>
             <Text style={styles.prescribedLabel}>TU COACH PAUTÓ</Text>
             <Text style={styles.prescribedValue}>
-              {target ? `${formatNumber(target.targetWeightKg, unit)} ${unit} × ${target.targetReps}` : ''}
+              {target === null
+                ? ''
+                : target.targetWeightKg === null
+                  ? 'Sin carga pautada — registrá lo que usaste'
+                  : `${formatNumber(target.targetWeightKg, unit)} ${unit} × ${target.targetReps}`}
             </Text>
           </View>
 
@@ -121,7 +126,9 @@ export function DeviationSheet({ target, unit, onSave, onReset, onClose }: Props
             accessibilityRole="button"
             style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
           >
-            <Text style={styles.secondaryText}>Lo hice tal cual</Text>
+            <Text style={styles.secondaryText}>
+              {target?.targetWeightKg === null ? 'Cancelar' : 'Lo hice tal cual'}
+            </Text>
           </Pressable>
           <Pressable
             onPress={save}
