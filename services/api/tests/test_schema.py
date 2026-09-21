@@ -298,6 +298,36 @@ async def test_el_descanso_tiene_un_techo_razonable(session: AsyncSession) -> No
 
 
 @pytest.mark.asyncio
+async def test_la_carga_no_puede_ser_kilos_y_porcentaje_a_la_vez(
+    session: AsyncSession,
+) -> None:
+    """El CHECK de la base, no solo el validador de Pydantic.
+
+    La API ya rechaza esta combinacion con 422, pero el CHECK es lo que
+    protege contra un script de migracion o un `psql` abierto a mano.
+    """
+    _, mex = await _meso_con_ejercicio(session)
+    session.add(
+        Prescription(
+            mesocycle_exercise_id=mex.id,
+            load_kg=100.0,
+            load_percent=75.0,
+            rest_seconds=150,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_el_porcentaje_tiene_un_rango_razonable(session: AsyncSession) -> None:
+    _, mex = await _meso_con_ejercicio(session)
+    session.add(Prescription(mesocycle_exercise_id=mex.id, load_percent=25.0, rest_seconds=150))
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
 async def test_los_campos_en_null_significan_automatico(session: AsyncSession) -> None:
     """Una prescripcion vacia es valida: el coach no toco nada."""
     _, mex = await _meso_con_ejercicio(session)

@@ -313,6 +313,13 @@ class Prescription(Base, TimestampMixin):
             name="rango_completo_o_vacio",
         ),
         CheckConstraint("rest_seconds > 0 AND rest_seconds <= 900", name="descanso_razonable"),
+        CheckConstraint(
+            "load_percent IS NULL OR (load_percent >= 30 AND load_percent <= 110)",
+            name="pct_razonable",
+        ),
+        # Una fila fija kilos o fija un porcentaje del 1RM, nunca los dos: si
+        # los dos convivieran no habria forma de saber cual gana al resolver.
+        CheckConstraint("load_kg IS NULL OR load_percent IS NULL", name="carga_o_porcentaje"),
         # Indice parcial: impide DOS prescripciones base para el mismo
         # ejercicio. El UNIQUE de arriba no lo cubre, porque tanto SQLite como
         # Postgres consideran que dos NULL son distintos.
@@ -343,6 +350,10 @@ class Prescription(Base, TimestampMixin):
 
     sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    #: Porcentaje del 1RM vigente del atleta. Se resuelve a kilos en el
+    #: servicio (`app/services/records.py::load_from_percent`), nunca aqui:
+    #: este modulo no sabe que existe una marca.
+    load_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     rep_lo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rep_hi: Mapped[int | None] = mapped_column(Integer, nullable=True)
     target_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)

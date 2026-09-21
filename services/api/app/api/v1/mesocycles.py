@@ -45,6 +45,7 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import last_performance, project_grid, to_domain_exercise
+from app.services.records import Mark, current_mark, current_marks
 
 router = APIRouter(prefix="/mesocycles", tags=["mesocycles"])
 
@@ -70,7 +71,9 @@ async def _load_full(session: SessionDep, meso_id: uuid.UUID) -> Mesocycle:
     return found.scalar_one()
 
 
-def _to_prescription_out(mex_id: uuid.UUID, p: Prescription | None) -> PrescriptionOut | None:
+def _to_prescription_out(
+    mex_id: uuid.UUID, p: Prescription | None, mark: Mark | None
+) -> PrescriptionOut | None:
     if p is None:
         return None
     return PrescriptionOut(
@@ -78,14 +81,18 @@ def _to_prescription_out(mex_id: uuid.UUID, p: Prescription | None) -> Prescript
         week_number=p.week_number,
         sets=p.sets,
         load_kg=p.load_kg,
+        load_percent=p.load_percent,
         rep_lo=p.rep_lo,
         rep_hi=p.rep_hi,
         target_rir=p.target_rir,
         rest_seconds=p.rest_seconds,
+        one_rm_kg=mark.value_kg if mark is not None else None,
+        needs_one_rm=p.load_percent is not None and mark is None,
     )
 
 
-def _to_out(meso: Mesocycle) -> MesocycleOut:
+async def _to_out(session: SessionDep, meso: Mesocycle) -> MesocycleOut:
+    marks = await current_marks(session, meso.athlete_id)
     return MesocycleOut(
         id=meso.id,
         athlete_id=meso.athlete_id,
@@ -110,7 +117,9 @@ def _to_out(meso: Mesocycle) -> MesocycleOut:
                 starting_load_kg=mex.starting_load_kg,
                 starting_reps=mex.starting_reps,
                 starting_sets=mex.starting_sets,
-                prescription=_to_prescription_out(mex.id, mex.base_prescription),
+                prescription=_to_prescription_out(
+                    mex.id, mex.base_prescription, marks.get(mex.catalog_id)
+                ),
             )
             for mex in meso.exercises
         ],
@@ -172,7 +181,7 @@ async def create_mesocycle(
         )
 
     await session.commit()
-    return _to_out(await _load_full(session, meso.id))
+    return await _to_out(session, await _load_full(session, meso.id))
 
 
 @router.get("", response_model=list[MesocycleSummaryOut])
@@ -235,7 +244,7 @@ async def list_mesocycles(
 
 @router.get("/{mesocycle_id}", response_model=MesocycleOut)
 async def get_mesocycle(meso: ReadableMeso, session: SessionDep) -> MesocycleOut:
-    return _to_out(await _load_full(session, meso.id))
+    return await _to_out(session, await _load_full(session, meso.id))
 
 
 @router.get("/{mesocycle_id}/plan", response_model=PlanGridOut)
@@ -256,6 +265,7 @@ async def plan_grid(meso: ReadableMeso, session: SessionDep) -> PlanGridOut:
         )
     )
     aggressiveness = Aggressiveness(meso.aggressiveness)
+    marks = await current_marks(session, meso.athlete_id)
 
     rows: list[PlanRowOut] = []
     for mex in found.scalars():
@@ -263,7 +273,14 @@ async def plan_grid(meso: ReadableMeso, session: SessionDep) -> PlanGridOut:
         exercise = to_domain_exercise(
             mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
         )
-        cells = project_grid(exercise, mex, aggressiveness, meso.total_weeks)
+        mark = marks.get(mex.catalog_id)
+        cells = project_grid(
+            exercise,
+            mex,
+            aggressiveness,
+            meso.total_weeks,
+            one_rm_kg=mark.value_kg if mark is not None else None,
+        )
 
         rows.append(
             PlanRowOut(
@@ -346,6 +363,7 @@ async def set_prescription(
     p = existing or Prescription(mesocycle_exercise_id=mex.id, week_number=body.week_number)
     p.sets = body.sets
     p.load_kg = body.load_kg
+    p.load_percent = body.load_percent
     p.rep_lo = body.rep_lo
     p.rep_hi = body.rep_hi
     p.target_rir = body.target_rir
@@ -354,6 +372,7 @@ async def set_prescription(
     session.add(p)
 
     await session.commit()
-    out = _to_prescription_out(mex.id, p)
+    mark = await current_mark(session, meso.athlete_id, mex.catalog_id)
+    out = _to_prescription_out(mex.id, p, mark)
     assert out is not None
     return out

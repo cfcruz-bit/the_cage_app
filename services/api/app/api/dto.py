@@ -14,7 +14,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.core.security import MIN_PASSWORD_LENGTH
 from app.domain.schemas import Aggressiveness, Exercise, Feedback, MuscleGroup
@@ -152,14 +152,29 @@ class PrescriptionIn(ApiModel):
     week_number: int | None = Field(default=None, ge=1, le=24)
     sets: int | None = Field(default=None, ge=1, le=20)
     load_kg: float | None = Field(default=None, gt=0, le=1000)
+    #: Porcentaje del 1RM vigente. Mutuamente excluyente con `load_kg`: kilos
+    #: fijos y porcentaje son dos formas de decir lo mismo, nunca las dos.
+    load_percent: float | None = Field(default=None, ge=30, le=110)
     rep_lo: int | None = Field(default=None, ge=1, le=100)
     rep_hi: int | None = Field(default=None, ge=1, le=100)
     target_rir: int | None = Field(default=None, ge=0, le=10)
     rest_seconds: int = Field(default=150, gt=0, le=900)
 
+    @model_validator(mode="after")
+    def _carga_o_porcentaje(self) -> PrescriptionIn:
+        if self.load_kg is not None and self.load_percent is not None:
+            raise ValueError("Fija la carga en kilos o en porcentaje del 1RM, no los dos")
+        return self
+
 
 class PrescriptionOut(PrescriptionIn):
     mesocycle_exercise_id: uuid.UUID
+    #: La marca vigente usada para resolver el porcentaje, o null si no hay
+    #: (o si esta fila no usa porcentaje).
+    one_rm_kg: float | None = None
+    #: True cuando hay `load_percent` pero el atleta no tiene marca de ese
+    #: ejercicio: la celda no se puede resolver a kilos todavia.
+    needs_one_rm: bool = False
 
 
 class MesocycleExerciseOut(ApiModel):
@@ -452,7 +467,15 @@ class PlanCellOut(ApiModel):
     week_number: int
     is_deload: bool
     sets: int
-    load_kg: float
+    #: null cuando la semana esta pautada por % y el atleta todavia no tiene
+    #: marca de ese ejercicio: no hay peso que mostrar, solo una intencion.
+    load_kg: float | None
+    #: El % que fijo el coach para esta semana, si lo hizo.
+    load_percent: float | None
+    #: La marca usada para resolverlo, o null si no aplica.
+    one_rm_kg: float | None
+    #: True si hace falta una marca de 1RM que todavia no existe.
+    needs_one_rm: bool
     rep_lo: int
     rep_hi: int
     target_rir: int

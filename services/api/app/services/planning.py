@@ -46,6 +46,7 @@ from app.models import (
     SetLog,
     TrainingSession,
 )
+from app.services.records import load_from_percent
 
 #: Feedback neutro para la primera semana, cuando todavia no hay historico.
 #: Son los valores que NO disparan ninguna regla del motor: sin dolor, sin
@@ -168,6 +169,13 @@ def effective_prescription(
     Orden: la fila de la semana, si no la base, si no ninguna. Cada campo se
     resuelve por separado, asi que retocar solo los sets de la semana 3 no
     borra la carga que el coach habia fijado para todo el bloque.
+
+    La carga es la excepcion: `load_kg` y `load_percent` se resuelven JUNTOS,
+    no cada uno por su lado. Si se resolvieran por separado, una semana que
+    solo fija porcentaje podria heredar el `load_kg` de la base y acabar con
+    los dos a la vez, violando el CHECK que impide tenerlos juntos en una fila
+    real. Si la semana toca la carga de cualquiera de las dos formas, manda
+    su propio par; si no toca ninguna, se hereda el par entero de la base.
     """
     base = mex.base_prescription
     if week_number is None:
@@ -179,11 +187,16 @@ def effective_prescription(
     if base is None:
         return week
 
+    week_sets_load = week.load_kg is not None or week.load_percent is not None
+    load_kg = week.load_kg if week_sets_load else base.load_kg
+    load_percent = week.load_percent if week_sets_load else base.load_percent
+
     return Prescription(
         mesocycle_exercise_id=mex.id,
         week_number=week_number,
         sets=week.sets if week.sets is not None else base.sets,
-        load_kg=week.load_kg if week.load_kg is not None else base.load_kg,
+        load_kg=load_kg,
+        load_percent=load_percent,
         rep_lo=week.rep_lo if week.rep_lo is not None else base.rep_lo,
         rep_hi=week.rep_hi if week.rep_hi is not None else base.rep_hi,
         target_rir=(week.target_rir if week.target_rir is not None else base.target_rir),
@@ -216,6 +229,7 @@ def resolve_plan(
     mex: MesocycleExercise,
     aggressiveness: Aggressiveness,
     week_number: int | None = None,
+    one_rm_kg: float | None = None,
 ) -> tuple[ExercisePlan, ExercisePlan]:
     """Devuelve (plan efectivo, sugerencia del motor).
 
@@ -226,15 +240,28 @@ def resolve_plan(
     Lo que el coach fijo manda; lo que dejo vacio lo decide el motor con el RIR
     y el feedback reales. Esa mezcla es el punto: pautar la semana 3 a mano no
     congela las otras cinco.
+
+    `one_rm_kg` es la marca vigente del atleta en este ejercicio, si la hay.
+    Esta funcion no la consulta: la pasa quien llama, que es quien tiene la
+    sesion asincrona (ver el docstring del modulo). Si la semana esta pautada
+    por porcentaje, el llamador tiene que haber comprobado ya que hay marca
+    -sesions.py responde 409 antes de llegar aqui si no la hay-, asi que
+    `one_rm_kg` llega garantizado cuando `load_percent` esta puesto.
     """
     effective = apply_prescription(exercise, mex, week_number)
     suggestion = plan_exercise(effective, aggressiveness)
 
     p = effective_prescription(mex, week_number)
-    if p is None or (p.sets is None and p.load_kg is None):
+    if p is None or (p.sets is None and p.load_kg is None and p.load_percent is None):
         return suggestion, suggestion
 
-    load_kg = p.load_kg if p.load_kg is not None else suggestion.load_kg
+    if p.load_percent is not None:
+        assert one_rm_kg is not None, "el llamador debe validar la marca antes de resolver"
+        load_kg = load_from_percent(one_rm_kg, p.load_percent, exercise.load_increment_kg)
+    elif p.load_kg is not None:
+        load_kg = p.load_kg
+    else:
+        load_kg = suggestion.load_kg
     sets = p.sets if p.sets is not None else suggestion.sets
 
     plan = suggestion.model_copy(
@@ -243,7 +270,7 @@ def resolve_plan(
             "sets": sets,
             "delta_kg": round6(load_kg - exercise.last.weight_kg),
             "why": _why_from_coach(
-                load_overridden=p.load_kg is not None,
+                load_overridden=p.load_kg is not None or p.load_percent is not None,
                 sets_overridden=p.sets is not None,
                 engine_why=suggestion.why,
             ),
@@ -310,6 +337,7 @@ def project_grid(
     mex: MesocycleExercise,
     aggressiveness: Aggressiveness,
     total_weeks: int,
+    one_rm_kg: float | None = None,
 ) -> list[dict]:
     """Que hara este ejercicio en cada semana del bloque.
 
@@ -319,9 +347,11 @@ def project_grid(
     dibuja el movil no puedan contar cosas distintas.
 
     Lo que el coach fija en una semana **arrastra**: si fuerza 80 kg en la
-    semana 3, la 4 progresa desde 80 y no desde donde iba la prevision. Lo
-    contrario —volver al carril original— haria que su intervencion pareciera
-    ignorada.
+    semana 3, la 4 progresa desde 80 y no desde donde iba la prevision. Un
+    porcentaje resuelto a kilos arrastra igual que un kilo fijado a mano; si
+    no hay marca para resolverlo, la celda queda en blanco (`load_kg = None`,
+    `needs_one_rm = True`) y NO mueve el ancla, porque no hay ningun kilo real
+    que arrastrar.
 
     Esto es una PREVISION. Lo que de verdad pase lo recalcula el servidor con
     el RIR y el feedback reales cuando se genere cada sesion.
@@ -359,6 +389,8 @@ def project_grid(
             load_kg = round_to(anchor_load + offset * increment, increment)
             sets = anchor_sets
 
+        needs_one_rm = False
+
         if p is not None and p.sets is not None:
             sets = p.sets
             anchor_sets = p.sets
@@ -366,6 +398,14 @@ def project_grid(
             load_kg = p.load_kg
             anchor_load = p.load_kg
             anchor_week = week
+        elif p is not None and p.load_percent is not None:
+            if one_rm_kg is not None:
+                load_kg = load_from_percent(one_rm_kg, p.load_percent, increment)
+                anchor_load = load_kg
+                anchor_week = week
+            else:
+                needs_one_rm = True
+                load_kg = None
 
         rows.append(
             {
@@ -373,12 +413,17 @@ def project_grid(
                 "is_deload": is_deload,
                 "sets": sets,
                 "load_kg": load_kg,
+                "load_percent": p.load_percent if p is not None else None,
+                "one_rm_kg": one_rm_kg,
+                "needs_one_rm": needs_one_rm,
                 "rep_lo": rep_lo,
                 "rep_hi": rep_hi,
                 "target_rir": target_rir,
                 "rest_seconds": rest_seconds_for(mex, week),
                 "sets_overridden": p is not None and p.sets is not None,
-                "load_overridden": p is not None and p.load_kg is not None,
+                "load_overridden": (
+                    p is not None and (p.load_kg is not None or p.load_percent is not None)
+                ),
                 "reps_overridden": p is not None and p.rep_lo is not None,
                 "rir_overridden": p is not None and p.target_rir is not None,
             }

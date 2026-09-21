@@ -47,12 +47,14 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import (
+    effective_prescription,
     last_performance,
     resolve_plan,
     rest_seconds_for,
     sets_for,
     to_domain_exercise,
 )
+from app.services.records import current_marks
 
 router = APIRouter(tags=["sessions"])
 
@@ -129,14 +131,37 @@ async def create_session(
             selectinload(MesocycleExercise.prescriptions),
         )
     )
+    mexs = list(found.scalars())
     aggressiveness = Aggressiveness(meso.aggressiveness)
+    marks = await current_marks(session, meso.athlete_id)
 
-    for mex in found.scalars():
+    # Se valida ANTES de generar nada: si un ejercicio pautado por % no tiene
+    # marca, la sesion no se genera a medias con el resto de ejercicios ya
+    # escritos. Como aun no hubo commit, el rollback de `get_session` deshace
+    # tambien la fila de `ts` de arriba.
+    for mex in mexs:
+        p = effective_prescription(mex, body.week_number)
+        if p is not None and p.load_percent is not None and mex.catalog_id not in marks:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Falta la marca de {mex.catalog.name} para calcular el {p.load_percent:g}%"
+                ),
+            )
+
+    for mex in mexs:
         last = await last_performance(session, mex)
         exercise = to_domain_exercise(
             mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
         )
-        plan, _suggestion = resolve_plan(exercise, mex, aggressiveness, body.week_number)
+        mark = marks.get(mex.catalog_id)
+        plan, _suggestion = resolve_plan(
+            exercise,
+            mex,
+            aggressiveness,
+            body.week_number,
+            one_rm_kg=mark.value_kg if mark is not None else None,
+        )
 
         session.add(
             SessionExercise(
