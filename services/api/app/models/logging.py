@@ -79,7 +79,9 @@ class SessionExercise(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("session_id", "mesocycle_exercise_id"),
         CheckConstraint("planned_sets >= 1", name="sets_planificados"),
-        CheckConstraint("planned_load_kg > 0", name="carga_planificada"),
+        CheckConstraint(
+            "planned_load_kg IS NULL OR planned_load_kg > 0", name="carga_planificada"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
@@ -91,7 +93,10 @@ class SessionExercise(Base, TimestampMixin):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    planned_load_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    #: NULL cuando se congelo sin ningun peso del que partir (ver el docstring
+    #: de `MesocycleExercise.starting_load_kg`). El atleta escribe el suyo en
+    #: la propia sesion; ese registro es lo que alimenta la PROXIMA.
+    planned_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     planned_sets: Mapped[int] = mapped_column(Integer, nullable=False)
 
     #: Version de las reglas con las que se calculo. Sin esto el historico no

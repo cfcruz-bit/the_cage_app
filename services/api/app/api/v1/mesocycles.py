@@ -33,7 +33,7 @@ from app.api.dto import (
     PrescriptionIn,
     PrescriptionOut,
 )
-from app.domain.schemas import Aggressiveness
+from app.domain.schemas import Aggressiveness, MuscleGroup
 from app.models import (
     CoachAthlete,
     ExerciseCatalog,
@@ -138,9 +138,13 @@ async def create_mesocycle(
         )
 
     ids = {e.catalog_id for e in body.exercises}
-    found = await session.execute(select(ExerciseCatalog.id).where(ExerciseCatalog.id.in_(ids)))
-    known = set(found.scalars())
-    if known != ids:
+    found = await session.execute(
+        select(ExerciseCatalog.id, ExerciseCatalog.muscle, ExerciseCatalog.name).where(
+            ExerciseCatalog.id.in_(ids)
+        )
+    )
+    catalog = {row.id: (row.muscle, row.name) for row in found.all()}
+    if set(catalog) != ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Hay ejercicios que no existen en el catalogo",
@@ -165,20 +169,60 @@ async def create_mesocycle(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El tope del rango de reps no puede ser menor que el suelo",
             )
-        session.add(
-            MesocycleExercise(
-                mesocycle_id=meso.id,
-                catalog_id=item.catalog_id,
-                position=position,
-                rep_lo=item.rep_lo,
-                rep_hi=item.rep_hi,
-                target_rir=item.target_rir,
-                load_increment_kg=item.load_increment_kg,
-                starting_load_kg=item.starting_load_kg,
-                starting_reps=item.starting_reps,
-                starting_sets=item.starting_sets,
+
+        week_numbers = [w.week_number for w in item.weeks]
+        if len(set(week_numbers)) != len(week_numbers):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hay semanas repetidas en la carga semana a semana de un ejercicio",
             )
+
+        muscle, name = catalog[item.catalog_id]
+        if muscle == MuscleGroup.BASICOS.value:
+            con_carga = {
+                w.week_number
+                for w in item.weeks
+                if w.load_kg is not None or w.load_percent is not None
+            }
+            faltantes = sorted(set(range(1, body.total_weeks + 1)) - con_carga)
+            if faltantes:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=(
+                        f"A {name} le falta la carga (kg o %) en la(s) semana(s) "
+                        f"{', '.join(str(w) for w in faltantes)}"
+                    ),
+                )
+
+        mex = MesocycleExercise(
+            mesocycle_id=meso.id,
+            catalog_id=item.catalog_id,
+            position=position,
+            rep_lo=item.rep_lo,
+            rep_hi=item.rep_hi,
+            target_rir=item.target_rir,
+            load_increment_kg=item.load_increment_kg,
+            starting_load_kg=item.starting_load_kg,
+            starting_reps=item.starting_reps,
+            starting_sets=item.starting_sets,
         )
+        session.add(mex)
+        await session.flush()
+
+        for week in item.weeks:
+            session.add(
+                Prescription(
+                    mesocycle_exercise_id=mex.id,
+                    week_number=week.week_number,
+                    sets=week.sets,
+                    load_kg=week.load_kg,
+                    load_percent=week.load_percent,
+                    rep_lo=week.rep_lo,
+                    rep_hi=week.rep_hi,
+                    target_rir=week.target_rir,
+                    set_by_id=coach.id,
+                )
+            )
 
     await session.commit()
     return await _to_out(session, await _load_full(session, meso.id))
@@ -270,8 +314,12 @@ async def plan_grid(meso: ReadableMeso, session: SessionDep) -> PlanGridOut:
     rows: list[PlanRowOut] = []
     for mex in found.scalars():
         last = await last_performance(session, mex)
-        exercise = to_domain_exercise(
-            mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
+        exercise = (
+            to_domain_exercise(
+                mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
+            )
+            if last is not None
+            else None
         )
         mark = marks.get(mex.catalog_id)
         cells = project_grid(

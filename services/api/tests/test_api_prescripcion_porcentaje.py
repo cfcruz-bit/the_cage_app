@@ -57,6 +57,9 @@ async def bloque(client: AsyncClient, admin: dict) -> dict:
                     "startingLoadKg": 100.0,
                     "startingReps": 3,
                     "startingSets": 3,
+                    # Un basico exige carga en TODAS las semanas (bloque 4).
+                    # Cada test que pauta la semana 3 la pisa con la suya.
+                    "weeks": [{"weekNumber": w, "loadKg": 100.0} for w in range(1, 7)],
                 }
             ],
         },

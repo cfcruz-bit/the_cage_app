@@ -125,15 +125,44 @@ class ExerciseCatalogOut(ExerciseCatalogIn):
 # ── Mesociclos ───────────────────────────────────────────────────────────────
 
 
+class WeekLoadIn(ApiModel):
+    """Una fila del paso 4 opcional: la carga de UNA semana de UN ejercicio.
+
+    Se guarda como una `Prescription` de esa semana. Es la misma regla de
+    `PrescriptionIn`: kilos o porcentaje, nunca los dos.
+    """
+
+    week_number: int = Field(ge=1, le=24)
+    load_kg: float | None = Field(default=None, gt=0, le=1000)
+    load_percent: float | None = Field(default=None, ge=30, le=110)
+    sets: int | None = Field(default=None, ge=1, le=20)
+    rep_lo: int | None = Field(default=None, ge=1, le=100)
+    rep_hi: int | None = Field(default=None, ge=1, le=100)
+    target_rir: int | None = Field(default=None, ge=0, le=10)
+
+    @model_validator(mode="after")
+    def _carga_o_porcentaje(self) -> WeekLoadIn:
+        if self.load_kg is not None and self.load_percent is not None:
+            raise ValueError("Fija la carga en kilos o en porcentaje del 1RM, no los dos")
+        return self
+
+
 class MesocycleExerciseIn(ApiModel):
     catalog_id: uuid.UUID
     rep_lo: int = Field(ge=1, le=100)
     rep_hi: int = Field(ge=1, le=100)
     target_rir: int = Field(ge=0, le=10)
     load_increment_kg: float = Field(gt=0, le=50)
-    starting_load_kg: float = Field(gt=0, le=1000)
+    #: Punto de partida de la semana 1. Sin el (None) no hay ningun peso del
+    #: que arrancar hasta que se registre uno real; ver el docstring de
+    #: `app.models.training.MesocycleExercise.starting_load_kg`.
+    starting_load_kg: float | None = Field(default=None, gt=0, le=1000)
     starting_reps: int = Field(ge=1, le=100)
     starting_sets: int = Field(ge=1, le=20)
+    #: Carga semana a semana del paso 4 opcional. Cada fila se guarda como una
+    #: `Prescription` de esa semana. Para un BASICO, el servidor exige que
+    #: aqui haya carga (kg o %) en TODAS las semanas del bloque.
+    weeks: list[WeekLoadIn] = Field(default_factory=list, max_length=24)
 
 
 class MesocycleIn(ApiModel):
@@ -189,7 +218,8 @@ class MesocycleExerciseOut(ApiModel):
     load_increment_kg: float
     #: Punto de partida de la semana 1. Viaja al cliente porque el movil usa el
     #: MISMO motor para dibujar la proyeccion del mesociclo sin pedir nada mas.
-    starting_load_kg: float
+    #: null cuando todavia no hay ningun peso: el accesorio se dejo libre.
+    starting_load_kg: float | None
     starting_reps: int
     starting_sets: int
     prescription: PrescriptionOut | None
@@ -233,8 +263,10 @@ class SessionCreate(ApiModel):
 
 class PlannedSetOut(ApiModel):
     index: int
-    target_weight_kg: float
-    target_reps: int
+    #: null cuando el ejercicio no tiene ningun peso todavia: el set sale en
+    #: blanco y el atleta escribe el suyo, sin marcador inventado.
+    target_weight_kg: float | None
+    target_reps: int | None
     why: str
     logged_weight_kg: float | None
     logged_reps: str | None
@@ -247,7 +279,9 @@ class SessionExerciseOut(ApiModel):
     position: int
     name: str
     muscle: str
-    planned_load_kg: float
+    #: null en la primera sesion de un ejercicio sin arranque: nadie ha dado
+    #: todavia un peso real. El atleta lo escribe el mismo en la sesion.
+    planned_load_kg: float | None
     planned_sets: int
     rest_seconds: int
     policy_version: str
@@ -261,7 +295,10 @@ class SessionExerciseOut(ApiModel):
     #: feedback antes de enviarlo: "esto subiria la carga a 65 kg". Ese calculo
     #: tiene que ser instantaneo y funcionar sin cobertura, asi que lo hace el
     #: cliente con el mismo motor. Lo que se persiste sigue saliendo de aqui.
-    exercise: Exercise
+    #:
+    #: null junto con `plannedLoadKg` null: sin ningun peso previo el motor no
+    #: tiene de donde partir, asi que tampoco hay preview local que calcular.
+    exercise: Exercise | None
 
 
 class SessionOut(ApiModel):

@@ -60,7 +60,9 @@ NEUTRAL_FEEDBACK = Feedback(
 )
 
 
-async def last_performance(session: AsyncSession, mex: MesocycleExercise) -> LastPerformance:
+async def last_performance(
+    session: AsyncSession, mex: MesocycleExercise
+) -> LastPerformance | None:
     """Que hizo el atleta la ultima vez con este ejercicio.
 
     Se busca la sesion COMPLETADA mas reciente. Una sesion a medias no cuenta:
@@ -68,7 +70,11 @@ async def last_performance(session: AsyncSession, mex: MesocycleExercise) -> Las
     subiria cargas por un dato que no representa lo que puede levantar.
 
     Si no hay historico, se devuelve el arranque que puso el coach con feedback
-    neutro.
+    neutro. **None** significa que no hay ningun peso del que partir -ni
+    arranque, ni un set completado con peso, ni la carga de una sesion
+    congelada-: el motor necesita SIEMPRE un ultimo peso para calcular, y
+    cuando no existe ninguno no se inventa. Quien llama tiene que tratar ese
+    caso aparte, sin construir un `Exercise` ni pasar por el motor.
     """
     previous = await session.execute(
         select(SessionExercise)
@@ -87,6 +93,8 @@ async def last_performance(session: AsyncSession, mex: MesocycleExercise) -> Las
     se = previous.scalar_one_or_none()
 
     if se is None:
+        if mex.starting_load_kg is None:
+            return None
         return LastPerformance(
             weight_kg=mex.starting_load_kg,
             reps=mex.starting_reps,
@@ -103,12 +111,16 @@ async def last_performance(session: AsyncSession, mex: MesocycleExercise) -> Las
     # justo lo que el motor modela aparte con el back-off.
     first = done[0] if done else None
 
+    weight = (
+        first.weight_kg
+        if first is not None and first.weight_kg is not None
+        else se.planned_load_kg
+    )
+    if weight is None:
+        return None
+
     return LastPerformance(
-        weight_kg=(
-            first.weight_kg
-            if first is not None and first.weight_kg is not None
-            else se.planned_load_kg
-        ),
+        weight_kg=weight,
         reps=reps_of(first) if first is not None else mex.starting_reps,
         rir=rir_of(first, mex.target_rir) if first is not None else mex.target_rir,
         sets=len(done) if done else se.planned_sets,
@@ -290,6 +302,34 @@ def _why_from_coach(*, load_overridden: bool, sets_overridden: bool, engine_why:
     return engine_why
 
 
+#: Lo que ve el atleta cuando el ejercicio no tiene ningun peso todavia.
+FIRST_SESSION_WHY = "Primera sesión: registra el peso que uses"
+
+
+def resolve_without_history(
+    mex: MesocycleExercise, week_number: int | None, one_rm_kg: float | None
+) -> tuple[float | None, int]:
+    """Carga y sets cuando no hay NINGUN peso previo del que partir.
+
+    Sin un ultimo peso el motor no puede correr -no tiene con que calcular un
+    delta ni un e1RM-, asi que esta rama vive fuera de el. Si el coach fijo una
+    carga o un porcentaje para esta semana, esa manda igual que siempre -es una
+    instruccion explicita, no algo que dependa del historico-; si no fijo nada,
+    no hay ningun peso que ofrecer y el llamador tiene que dejarlo en blanco.
+    """
+    p = effective_prescription(mex, week_number)
+    sets = p.sets if p is not None and p.sets is not None else mex.starting_sets
+
+    if p is None:
+        return None, sets
+    if p.load_kg is not None:
+        return p.load_kg, sets
+    if p.load_percent is not None:
+        assert one_rm_kg is not None, "el llamador debe validar la marca antes de resolver"
+        return load_from_percent(one_rm_kg, p.load_percent, mex.load_increment_kg), sets
+    return None, sets
+
+
 def rest_seconds_for(mex: MesocycleExercise, week_number: int | None = None) -> int:
     """El descanso SIEMPRE lo pauta el coach: no tiene modo automatico."""
     p = effective_prescription(mex, week_number)
@@ -333,7 +373,7 @@ async def feedback_for(
 
 
 def project_grid(
-    exercise: Exercise,
+    exercise: Exercise | None,
     mex: MesocycleExercise,
     aggressiveness: Aggressiveness,
     total_weeks: int,
@@ -353,41 +393,58 @@ def project_grid(
     `needs_one_rm = True`) y NO mueve el ancla, porque no hay ningun kilo real
     que arrastrar.
 
+    `exercise` es None cuando no hay NINGUN peso previo -ni arranque, ni
+    historico- del que el motor pueda partir (ver `last_performance`). Sin el,
+    no hay ninguna sugerencia propia que calcular: la fila entera sale en
+    blanco hasta que el coach fije un kilo o un porcentaje resoluble a mano en
+    alguna semana, y desde ahi progresa exactamente igual que cualquier otra.
+
     Esto es una PREVISION. Lo que de verdad pase lo recalcula el servidor con
     el RIR y el feedback reales cuando se genere cada sesion.
     """
-    base = plan_exercise(apply_prescription(exercise, mex), aggressiveness)
-    increment = exercise.load_increment_kg
-
+    increment = mex.load_increment_kg
     rows: list[dict] = []
 
     #: Desde donde extrapolar, y desde que semana. Se mueve cada vez que el
-    #: coach fija una carga a mano.
-    anchor_load = base.load_kg
+    #: coach fija una carga a mano. None mientras no haya ningun ancla real.
+    if exercise is not None:
+        base = plan_exercise(apply_prescription(exercise, mex), aggressiveness)
+        anchor_load: float | None = base.load_kg
+        anchor_sets = base.sets
+    else:
+        anchor_load = None
+        anchor_sets = mex.starting_sets
     anchor_week = 1
-    anchor_sets = base.sets
 
     for week in range(1, total_weeks + 1):
         is_deload = week == total_weeks
         p = effective_prescription(mex, week)
 
-        rep_lo = p.rep_lo if p is not None and p.rep_lo is not None else exercise.rep_lo
-        rep_hi = p.rep_hi if p is not None and p.rep_hi is not None else exercise.rep_hi
+        rep_lo = p.rep_lo if p is not None and p.rep_lo is not None else mex.rep_lo
+        rep_hi = p.rep_hi if p is not None and p.rep_hi is not None else mex.rep_hi
         target_rir = (
-            p.target_rir if p is not None and p.target_rir is not None else exercise.target_rir
+            p.target_rir if p is not None and p.target_rir is not None else mex.target_rir
         )
 
         if is_deload:
-            load_kg = round_to(anchor_load * DELOAD_LOAD_FACTOR, increment)
             sets = DELOAD_SETS
+            load_kg = (
+                None
+                if anchor_load is None
+                else round_to(anchor_load * DELOAD_LOAD_FACTOR, increment)
+            )
             if p is None or p.target_rir is None:
                 target_rir = DELOAD_RIR
             if p is None or p.rep_hi is None:
                 rep_hi = rep_lo
         else:
-            offset = week - anchor_week
-            load_kg = round_to(anchor_load + offset * increment, increment)
             sets = anchor_sets
+            offset = week - anchor_week
+            load_kg = (
+                None
+                if anchor_load is None
+                else round_to(anchor_load + offset * increment, increment)
+            )
 
         needs_one_rm = False
 

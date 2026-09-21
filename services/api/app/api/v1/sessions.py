@@ -36,6 +36,7 @@ from app.api.dto import (
     SetLogBatch,
     SyncResult,
 )
+from app.domain.policy import POLICY_VERSION
 from app.domain.schemas import Aggressiveness
 from app.models import (
     ExerciseFeedback,
@@ -47,9 +48,11 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import (
+    FIRST_SESSION_WHY,
     effective_prescription,
     last_performance,
     resolve_plan,
+    resolve_without_history,
     rest_seconds_for,
     sets_for,
     to_domain_exercise,
@@ -151,16 +154,32 @@ async def create_session(
 
     for mex in mexs:
         last = await last_performance(session, mex)
+        mark = marks.get(mex.catalog_id)
+        one_rm_kg = mark.value_kg if mark is not None else None
+
+        if last is None:
+            # Sin ningun peso previo el motor no tiene de donde partir. Si el
+            # coach fijo uno para esta semana (kg o %) se usa directo; si no,
+            # el ejercicio sale en blanco y el atleta escribe el suyo.
+            load_kg, sets = resolve_without_history(mex, body.week_number, one_rm_kg)
+            session.add(
+                SessionExercise(
+                    session_id=ts.id,
+                    mesocycle_exercise_id=mex.id,
+                    position=mex.position,
+                    planned_load_kg=load_kg,
+                    planned_sets=sets,
+                    policy_version=POLICY_VERSION,
+                    why=FIRST_SESSION_WHY if load_kg is None else "carga pautada por tu coach",
+                )
+            )
+            continue
+
         exercise = to_domain_exercise(
             mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
         )
-        mark = marks.get(mex.catalog_id)
         plan, _suggestion = resolve_plan(
-            exercise,
-            mex,
-            aggressiveness,
-            body.week_number,
-            one_rm_kg=mark.value_kg if mark is not None else None,
+            exercise, mex, aggressiveness, body.week_number, one_rm_kg=one_rm_kg
         )
 
         session.add(
@@ -339,7 +358,31 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
         )
         mex = mex_found.scalar_one()
 
+        if se.planned_load_kg is None:
+            # Se congelo sin ningun peso: no hay motor que ejecutar ni
+            # objetivos que calcular. Las series salen en blanco y el atleta
+            # escribe lo suyo; lo ya registrado se sigue mostrando igual.
+            out.append(
+                SessionExerciseOut(
+                    id=se.id,
+                    position=se.position,
+                    name=mex.catalog.name,
+                    muscle=mex.catalog.muscle,
+                    planned_load_kg=None,
+                    planned_sets=se.planned_sets,
+                    rest_seconds=rest_seconds_for(mex, ts.week_number),
+                    policy_version=se.policy_version,
+                    why=se.why,
+                    exercise=None,
+                    sets=_blank_sets(se),
+                )
+            )
+            continue
+
         last = await last_performance(session, mex)
+        # Si esta fila tiene un peso congelado, tuvo que haber un ultimo peso
+        # cuando se genero, y el historico solo crece: sigue habiendolo.
+        assert last is not None, "una fila con peso congelado no puede quedarse sin historico"
         exercise = to_domain_exercise(
             mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
         )
@@ -385,6 +428,29 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
         completed_at=ts.completed_at,
         exercises=out,
     )
+
+
+def _blank_sets(se: SessionExercise) -> list[PlannedSetOut]:
+    """Las series de un ejercicio sin ningun peso, con lo ya registrado."""
+    by_index = {log.idx: log for log in se.set_logs}
+    size = max(max(by_index) + 1, se.planned_sets) if by_index else se.planned_sets
+
+    out: list[PlannedSetOut] = []
+    for i in range(size):
+        log = by_index.get(i)
+        out.append(
+            PlannedSetOut(
+                index=i,
+                target_weight_kg=None,
+                target_reps=None,
+                why="",
+                logged_weight_kg=log.weight_kg if log is not None else None,
+                logged_reps=log.reps if log is not None else None,
+                logged_rpe=log.rpe if log is not None else None,
+                done=bool(log.done) if log is not None else False,
+            )
+        )
+    return out
 
 
 def _frozen_plan(se: SessionExercise, exercise):  # type: ignore[no-untyped-def]

@@ -235,7 +235,9 @@ class MesocycleExercise(Base, TimestampMixin):
         CheckConstraint("rep_lo >= 1 AND rep_hi >= rep_lo", name="rango_reps"),
         CheckConstraint("target_rir >= 0 AND target_rir <= 10", name="rir_valido"),
         CheckConstraint("load_increment_kg > 0", name="incremento_positivo"),
-        CheckConstraint("starting_load_kg > 0", name="carga_inicial_positiva"),
+        CheckConstraint(
+            "starting_load_kg IS NULL OR starting_load_kg > 0", name="carga_inicial_positiva"
+        ),
         CheckConstraint("starting_reps >= 1 AND starting_sets >= 1", name="arranque_positivo"),
     )
 
@@ -256,7 +258,13 @@ class MesocycleExercise(Base, TimestampMixin):
     #: Punto de partida de la semana 1. El motor necesita SIEMPRE un "la vez
     #: anterior" para calcular; cuando todavia no hay historico, es esto. Lo
     #: rellena el coach en el test de cargas iniciales.
-    starting_load_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    #:
+    #: NULL es valido y significa que todavia no hay ningun peso: pasa con los
+    #: accesorios, que el producto deja sin arranque a proposito. Mientras sea
+    #: NULL y no haya ninguna sesion completada con peso, el motor no corre
+    #: para este ejercicio (`app/services/planning.py::last_performance`): no
+    #: hay ningun peso inventado que ofrecerle.
+    starting_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     starting_reps: Mapped[int] = mapped_column(Integer, nullable=False)
     starting_sets: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
 

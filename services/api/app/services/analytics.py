@@ -150,6 +150,10 @@ def _session_e1rm(se: SessionExercise, fallback_rir: int) -> float:
     if log is None:
         return 0.0
     weight = log.weight_kg if log.weight_kg is not None else se.planned_load_kg
+    # Sin ningun peso -ni registrado, ni planificado- no hay e1RM que estimar.
+    # Cuenta 0, igual que "sin sets marcados": no hay nada que inventar aqui.
+    if weight is None:
+        return 0.0
     return estimate_e1rm(weight, reps_of(log), rir_of(log, fallback_rir))
 
 
