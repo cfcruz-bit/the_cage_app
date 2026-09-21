@@ -16,6 +16,8 @@
     "apk": "npm run build:apk -w @cage/mobile"
   },
   "overrides": {
-    "react": "19.2.3"
+    "react": "19.2.3",
+    "uuid": "^11.1.1",
+    "decode-uri-component": "^0.5.0"
   }
 }

@@ -47,12 +47,38 @@ CABLE = 2.5  # una placa de torre
 CORPORAL = 2.5  # lastre en cinturon
 
 CATALOG: tuple[Seed, ...] = (
+    # ── Basicos ──────────────────────────────────────────────────────────────
+    #
+    # Los tres movimientos de competicion y sus variantes. Van en su propio
+    # grupo porque asi se programan: primero el basico del dia, luego el
+    # accesorio. Ver el docstring de MuscleGroup.BASICOS.
+    #
+    # Los rangos son cortos y el RIR alto a proposito. En fuerza la serie se
+    # corta antes del fallo tecnico, no del muscular: una repeticion con la
+    # espalda redondeada no suma, resta.
+    #
+    # "tempo" y los "ct" (counts, la pausa en segundos) no llevan el detalle en
+    # el nombre porque el tempo exacto lo pauta el coach por semana. El nombre
+    # dice que ejercicio es; la prescripcion dice como se hace ese dia.
+    Seed("Press banca competicion", "BASICOS", "Barra", 1, 5, 2, BARRA),
+    Seed("Press banca tempo", "BASICOS", "Barra", 3, 6, 3, BARRA),
+    Seed("Press banca agarre medio", "BASICOS", "Barra", 3, 6, 2, BARRA),
+    Seed("Press banca agarre cerrado", "BASICOS", "Barra", 4, 8, 2, BARRA),
+    Seed("Press banca 5ct", "BASICOS", "Barra", 2, 5, 3, BARRA),
+    Seed("Press banca 3ct", "BASICOS", "Barra", 3, 6, 3, BARRA),
+    Seed("Press banca larsen", "BASICOS", "Barra", 3, 6, 2, BARRA),
+    Seed("Sentadilla lowbar", "BASICOS", "Barra", 1, 5, 2, BARRA),
+    Seed("Sentadilla highbar", "BASICOS", "Barra", 3, 6, 2, BARRA),
+    Seed("Sentadilla SSB", "BASICOS", "Barra", 4, 8, 2, BARRA),
+    Seed("Sentadilla tempo", "BASICOS", "Barra", 3, 6, 3, BARRA),
+    Seed("Peso muerto pausa", "BASICOS", "Barra", 2, 5, 3, BARRA),
     # ── Pecho ────────────────────────────────────────────────────────────────
     Seed("Press banca con barra", "CHEST", "Barra", 5, 8, 2, BARRA),
     Seed("Press inclinado con barra", "CHEST", "Barra", 6, 10, 2, BARRA),
     Seed("Press banca con mancuernas", "CHEST", "Mancuernas", 8, 12, 2, MANCUERNA),
     Seed("Press inclinado con mancuernas", "CHEST", "Mancuernas", 8, 12, 2, MANCUERNA),
     Seed("Aperturas en polea", "CHEST", "Cable", 12, 20, 1, CABLE),
+    Seed("Aperturas sentado en polea", "CHEST", "Cable", 12, 20, 1, CABLE),
     Seed("Fondos en paralelas", "CHEST", "Peso corporal", 6, 12, 2, CORPORAL),
     Seed("Press en maquina", "CHEST", "Maquina", 8, 15, 1, MAQUINA),
     # ── Espalda ──────────────────────────────────────────────────────────────
@@ -62,6 +88,8 @@ CATALOG: tuple[Seed, ...] = (
     Seed("Remo con mancuerna a una mano", "BACK", "Mancuernas", 8, 12, 2, MANCUERNA),
     Seed("Remo en maquina", "BACK", "Maquina", 8, 15, 1, MAQUINA),
     Seed("Pull-over en polea", "BACK", "Cable", 12, 20, 1, CABLE),
+    Seed("Remo gironda en polea", "BACK", "Cable", 8, 15, 2, CABLE),
+    Seed("Remo sentado en polea", "BACK", "Cable", 8, 15, 2, CABLE),
     Seed("Peso muerto convencional", "BACK", "Barra", 3, 6, 3, BARRA),
     # ── Hombros ──────────────────────────────────────────────────────────────
     Seed("Press militar con barra", "SHOULDERS", "Barra", 5, 8, 2, BARRA),
@@ -76,8 +104,10 @@ CATALOG: tuple[Seed, ...] = (
     Seed("Curl martillo", "BICEPS", "Mancuernas", 8, 15, 1, MANCUERNA),
     Seed("Curl en predicador", "BICEPS", "Maquina", 8, 15, 1, MAQUINA),
     Seed("Curl en polea", "BICEPS", "Cable", 10, 20, 1, CABLE),
+    Seed("Curl martillo en polea", "BICEPS", "Cable", 10, 20, 1, CABLE),
     # ── Triceps ──────────────────────────────────────────────────────────────
     Seed("Press frances", "TRICEPS", "Barra", 8, 12, 1, BARRA),
+    Seed("JM press", "TRICEPS", "Barra", 6, 12, 2, BARRA),
     Seed("Extension en polea con cuerda", "TRICEPS", "Cable", 10, 20, 1, CABLE),
     Seed("Press cerrado", "TRICEPS", "Barra", 6, 10, 2, BARRA),
     Seed("Extension sobre la cabeza", "TRICEPS", "Mancuernas", 10, 15, 1, MANCUERNA),

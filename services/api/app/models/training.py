@@ -69,6 +69,17 @@ class TrainingGoal(StrEnum):
     HYBRID = "hibrido"
 
 
+class OneRepMaxSource(StrEnum):
+    """De donde salio la marca. No todas valen lo mismo."""
+
+    #: Test de fuerza en el gimnasio.
+    TEST = "test"
+    #: Competicion oficial. El dato mas fiable que hay.
+    COMPETICION = "competicion"
+    #: Calculada con Epley desde una serie submaxima registrada.
+    ESTIMADA = "estimada"
+
+
 class ExerciseCatalog(Base, TimestampMixin):
     """Biblioteca de ejercicios.
 
@@ -98,6 +109,68 @@ class ExerciseCatalog(Base, TimestampMixin):
     load_increment_kg: Mapped[float] = mapped_column(Float, nullable=False)
 
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class OneRepMax(Base, TimestampMixin):
+    """Una marca del atleta en un ejercicio, con su fecha.
+
+    Existe porque los basicos se programan por PORCENTAJE. Sin saber el maximo
+    del atleta, un "75%" no es un peso: es una intencion.
+
+    **Es un historial, no un campo.** Cada test o competicion anade una fila;
+    ninguna sobrescribe a la anterior. Tres razones:
+
+    - La marca vigente es la mas reciente, y eso se calcula, no se guarda.
+    - Un mesociclo programado en marzo se pauto con la marca de marzo. Si la
+      marca fuera un campo mutable, subir el maximo reescribiria en silencio
+      los pesos de todos los bloques pasados y el historial mentiria.
+    - La progresion de marcas en el tiempo es, para un powerlifter, el dato que
+      mas le importa de todos.
+
+    `source` distingue de donde salio, porque no valen lo mismo: un 180 en
+    competicion es un hecho, un 180 estimado con Epley desde una serie de 5 es
+    una cuenta.
+    """
+
+    __tablename__ = "one_rep_maxes"
+    __table_args__ = (
+        enum_check("source", OneRepMaxSource, "origen_valido"),
+        CheckConstraint("value_kg > 0 AND value_kg <= 600", name="marca_razonable"),
+        # Dos marcas del mismo ejercicio el mismo dia son un dedazo, no dos
+        # tests: nadie hace dos maximos del mismo movimiento en una sesion.
+        UniqueConstraint("athlete_id", "exercise_id", "achieved_on"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
+
+    athlete_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    exercise_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("exercise_catalog.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    #: En KG, como todo lo que se persiste. Libras es preferencia de pantalla.
+    value_kg: Mapped[float] = mapped_column(Float, nullable=False)
+
+    #: El dia del test, NO el dia en que se escribio en la app. Un coach
+    #: apuntando el lunes la marca del sabado tiene que poder poner el sabado.
+    achieved_on: Mapped[date] = mapped_column(Date, nullable=False)
+
+    source: Mapped[str] = mapped_column(String(12), nullable=False)
+
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    #: Que coach la registro. Para el historial de "quien apunto esto".
+    set_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 

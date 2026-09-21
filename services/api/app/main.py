@@ -15,9 +15,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-from app.api.v1 import admin, auth, catalog, coach, mesocycles, sessions
+from app.api.v1 import admin, auth, catalog, coach, mesocycles, records, sessions
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.db.session import dispose_engine
 
 settings = get_settings()
@@ -40,6 +44,10 @@ app = FastAPI(
     openapi_url=None if settings.is_production else "/openapi.json",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 if settings.cors_origins:
     app.add_middleware(
         CORSMiddleware,
@@ -56,6 +64,7 @@ for router in (
     coach.router,
     catalog.router,
     mesocycles.router,
+    records.router,
     sessions.router,
 ):
     app.include_router(router, prefix=API_V1)

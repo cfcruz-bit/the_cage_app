@@ -497,3 +497,38 @@ class PlanGridOut(ApiModel):
     total_weeks: int
     current_week_index: int
     rows: list[PlanRowOut]
+
+
+# ── Marcas de fuerza (1RM) ───────────────────────────────────────────────────
+
+
+class OneRepMaxIn(ApiModel):
+    """Una marca que el coach registra.
+
+    `achievedOn` es el dia del TEST, no el de hoy: se apunta el lunes lo que
+    paso el sabado. Por eso no tiene valor por defecto y hay que mandarlo.
+    """
+
+    exercise_id: uuid.UUID
+    #: 600 kg es el techo del CHECK de la base. Por debajo de 20 casi siempre
+    #: es un cero que falta, pero se deja pasar: hay atletas que empiezan con
+    #: la barra vacia y no es asunto de la API decidirlo.
+    value_kg: float = Field(gt=0, le=600)
+    achieved_on: date
+    source: str = Field(pattern="^(test|competicion|estimada)$")
+    note: str | None = Field(default=None, max_length=200)
+
+
+class OneRepMaxOut(ApiModel):
+    id: uuid.UUID
+    exercise_id: uuid.UUID
+    #: Para no obligar al movil a cruzar con el catalogo solo para pintarlo.
+    exercise_name: str
+    muscle: str
+    value_kg: float
+    achieved_on: date
+    source: str
+    note: str | None = None
+    #: True si es la vigente de ese ejercicio. La calcula el servidor: es la
+    #: mas reciente por fecha, y el cliente no deberia tener que deducirlo.
+    current: bool = False

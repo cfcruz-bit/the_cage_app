@@ -19,6 +19,8 @@ from app.models.training import (
     Mesocycle,
     MesocycleExercise,
     MesocycleStatus,
+    OneRepMax,
+    OneRepMaxSource,
     Prescription,
     TrainingGoal,
 )
@@ -40,6 +42,8 @@ __all__ = [
     "Mesocycle",
     "MesocycleExercise",
     "MesocycleStatus",
+    "OneRepMax",
+    "OneRepMaxSource",
     "Prescription",
     "RefreshToken",
     "SessionExercise",

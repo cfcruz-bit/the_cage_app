@@ -7,9 +7,14 @@
  *
  * El orden no es alfabético: va de arriba abajo del cuerpo, que es como un
  * coach recorre un plan y como estaba ordenado el prototipo.
+ *
+ * `BASICOS` va primero y no es un músculo: son los movimientos de competición
+ * y sus variantes. Encabeza la lista porque es por donde empieza cualquier
+ * sesión de fuerza — el básico del día va antes que el accesorio, siempre.
  */
 
 export const MUSCLE_ORDER = [
+  'BASICOS',
   'CHEST',
   'BACK',
   'SHOULDERS',
@@ -25,6 +30,7 @@ export const MUSCLE_ORDER = [
 export type MuscleKey = (typeof MUSCLE_ORDER)[number];
 
 export const MUSCLE_LABEL: Record<string, string> = {
+  BASICOS: 'Básicos',
   CHEST: 'Pecho',
   BACK: 'Espalda',
   SHOULDERS: 'Hombros',

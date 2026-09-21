@@ -112,8 +112,17 @@ async def client(database_url: str):
     from sqlalchemy import event
 
     from app.core.config import Settings, get_settings
+    from app.core.rate_limit import limiter
     from app.db.session import build_engine, build_sessionmaker, get_session
     from app.main import app
+
+    # El limiter es un singleton a nivel de modulo y todas las peticiones de
+    # test comparten la misma IP (la del cliente httpx). Un solo escenario de
+    # permisos ya crea y loguea a cuatro cuentas, mas peticiones de las que el
+    # limite de produccion permite por minuto: no es señal de que el limite
+    # este mal puesto, es que los tests no son el trafico que ese limite
+    # regula. Se apaga aqui y se prueba aparte en test_rate_limit.py.
+    limiter.enabled = False
 
     settings = Settings(database_url=database_url)
     engine = build_engine(settings)

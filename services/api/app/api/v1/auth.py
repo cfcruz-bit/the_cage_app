@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.api.deps import AdminUser, CurrentUser, SessionDep, SettingsDep
@@ -28,6 +28,7 @@ from app.api.dto import (
     TokenPair,
     UserOut,
 )
+from app.core.rate_limit import limiter
 from app.core.security import (
     InvalidToken,
     create_token,
@@ -67,7 +68,10 @@ async def _issue(session, settings, user: User) -> TokenPair:
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, session: SessionDep, _admin: AdminUser) -> UserOut:
+@limiter.limit("5/minute")
+async def register(
+    request: Request, body: RegisterRequest, session: SessionDep, _admin: AdminUser
+) -> UserOut:
     """Alta directa. **Solo el administrador.**
 
     El registro publico estuvo abierto durante el desarrollo y ya no lo esta:
@@ -95,7 +99,10 @@ async def register(body: RegisterRequest, session: SessionDep, _admin: AdminUser
 
 
 @router.post("/login", response_model=TokenPair)
-async def login(body: LoginRequest, session: SessionDep, settings: SettingsDep) -> TokenPair:
+@limiter.limit("5/minute")
+async def login(
+    request: Request, body: LoginRequest, session: SessionDep, settings: SettingsDep
+) -> TokenPair:
     found = await session.execute(select(User).where(User.email == body.email))
     user = found.scalar_one_or_none()
 
@@ -121,8 +128,9 @@ async def login(body: LoginRequest, session: SessionDep, settings: SettingsDep) 
 
 
 @router.post("/refresh", response_model=TokenPair)
+@limiter.limit("5/minute")
 async def refresh(
-    body: RefreshRequest, session: SessionDep, settings: SettingsDep
+    request: Request, body: RefreshRequest, session: SessionDep, settings: SettingsDep
 ) -> TokenPair:
     """Canjea un refresh token por un par nuevo, y **revoca el usado**.
 

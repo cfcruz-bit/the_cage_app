@@ -40,6 +40,7 @@ EXPECTED_TABLES = {
     "memberships",
     "mesocycle_exercises",
     "mesocycles",
+    "one_rep_maxes",
     "prescriptions",
     "refresh_tokens",
     "session_exercises",

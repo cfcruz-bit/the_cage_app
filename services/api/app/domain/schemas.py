@@ -32,6 +32,21 @@ class DomainModel(BaseModel):
 
 
 class MuscleGroup(StrEnum):
+    """Como se agrupa el catalogo.
+
+    `BASICOS` no es un musculo y esta aqui a proposito: son los tres
+    movimientos de competicion y sus variantes, que el coach programa como
+    bloque propio y no repartidos entre pecho, cuadriceps y espalda. Agruparlos
+    por musculo era tecnicamente correcto y practicamente inutil: nadie monta
+    un dia de "pecho" que empiece por una sentadilla lowbar.
+
+    Consecuencia a tener presente: los objetivos de volumen semanal se cuentan
+    por musculo, y lo que se haga en BASICOS no suma a ninguno de ellos. Para
+    los basicos el volumen lo fija el coach a mano, que es como se programa
+    fuerza de todas formas.
+    """
+
+    BASICOS = "BASICOS"
     CHEST = "CHEST"
     BACK = "BACK"
     SHOULDERS = "SHOULDERS"
