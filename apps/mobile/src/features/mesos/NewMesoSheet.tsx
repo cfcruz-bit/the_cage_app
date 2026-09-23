@@ -352,6 +352,22 @@ export function NewMesoSheet({
     }
   }
 
+  /**
+   * Que basicos siguen sin carga, para poder decirlo PEGADO a los botones.
+   *
+   * El aviso por ejercicio ya existe, pero vive dentro de su tarjeta: con seis
+   * ejercicios queda a varias pantallas de scroll del pie, y desde abajo lo
+   * unico que se ve es un boton apagado sin explicacion. Un boton que no se
+   * deja pulsar y no dice por que se lee como una app rota.
+   */
+  const pendientes = useMemo(
+    () =>
+      drafts
+        .map((d) => ({ name: d.name, missing: missingWeeksFor(d, weeks) }))
+        .filter((p) => p.missing.length > 0),
+    [drafts, weeks],
+  );
+
   const canAdvance =
     step === 1
       ? athleteId !== null
@@ -655,6 +671,24 @@ export function NewMesoSheet({
             </>
           ) : null}
         </ScrollView>
+
+        {step === 3 && pendientes.length > 0 ? (
+          <View style={styles.blocker}>
+            <Text style={styles.blockerTitle}>
+              Falta carga para poder crear el mesociclo
+            </Text>
+            {pendientes.map((p) => (
+              <Text key={p.name} style={styles.blockerItem}>
+                {p.name} · semana{p.missing.length > 1 ? 's' : ''}{' '}
+                {p.missing.join(', ')}
+              </Text>
+            ))}
+            <Text style={styles.blockerHelp}>
+              Los básicos llevan carga en todas las semanas. Escribe un
+              porcentaje (75%) o kilos (102.5) en cada casilla.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.footer}>
           {step > 1 ? (
@@ -981,6 +1015,26 @@ const styles = StyleSheet.create({
   },
   weekInputError: { borderColor: color.accent },
 
+  blocker: {
+    borderTopWidth: 1,
+    borderTopColor: color.border,
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    gap: 2,
+  },
+  blockerTitle: {
+    color: color.accent,
+    fontSize: 12.5,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  blockerItem: { color: color.accent, fontSize: 12.5, lineHeight: 18 },
+  blockerHelp: {
+    color: color.textFaint,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 2,
+  },
   footer: {
     flexDirection: 'row',
     gap: space.sm,
