@@ -7,6 +7,10 @@
  * pasos en vez de apilarlo todo, porque un formulario de veinte campos en un
  * teléfono se abandona.
  *
+ * El bloque se reparte en **días** (paso 1: cuántos por semana; paso 2: a qué
+ * día va cada ejercicio y, si se quiere, cómo se llama cada día). El reparto
+ * es fijo para todo el bloque y ningún día puede quedarse sin ejercicios.
+ *
  * El paso 3 es el que nadie puede adivinar por ti: **la carga**. No hay ningún
  * peso inventado -ni un arranque de 20 kg ni ningún otro-, así que la regla la
  * pone el producto:
@@ -36,6 +40,7 @@ import { ApiError } from '@/api/client';
 import { createMesocycle, listExercises } from '@/api/endpoints';
 import type {
   ExerciseCatalogOut,
+  MesocycleDayOut,
   MesocycleExerciseIn,
   TrainingGoal,
   UserOut,
@@ -43,6 +48,7 @@ import type {
 } from '@/api/types';
 import { Chip } from '@/components/Chip';
 import { PlanGrid } from '@/features/mesos/PlanGrid';
+import { dayHeading, emptyDays, groupByDay } from '@/lib/days';
 import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
 import { groupByMuscle, muscleLabel } from '@/lib/muscles';
 import { useRemote } from '@/lib/remote';
@@ -51,6 +57,7 @@ import { useSession } from '@/stores/session';
 import { color, palette, radius, space } from '@/theme/tokens';
 
 const WEEKS = [4, 5, 6, 8] as const;
+const DAYS_PER_WEEK = [1, 2, 3, 4, 5, 6, 7] as const;
 const AGGRESSIVENESS: Aggressiveness[] = ['Baja', 'Media', 'Alta'];
 
 const GOALS: TrainingGoal[] = ['fuerza', 'hipertrofia', 'hibrido'];
@@ -164,6 +171,9 @@ export function NewMesoSheet({
   const [weeks, setWeeks] = useState<number>(6);
   const [aggressiveness, setAggressiveness] = useState<Aggressiveness>('Media');
   const [goal, setGoal] = useState<TrainingGoal>('hipertrofia');
+  const [daysPerWeek, setDaysPerWeek] = useState<number>(1);
+  /** Nombre opcional por día. Vacío o ausente = el día se llama "Día N". */
+  const [dayNames, setDayNames] = useState<Record<number, string>>({});
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery] = useState('');
   const [pendingAction, setPendingAction] = useState<'crear' | 'pautar' | null>(null);
@@ -175,6 +185,25 @@ export function NewMesoSheet({
   const chosen = useMemo(
     () => new Set(drafts.map((d) => d.catalogId)),
     [drafts],
+  );
+
+  /** Solo los días que existen y tienen nombre: es lo que viaja al servidor. */
+  const namedDays = useMemo<MesocycleDayOut[]>(
+    () =>
+      Object.entries(dayNames)
+        .map(([n, name]) => ({ dayNumber: Number(n), name: name.trim() }))
+        .filter((d) => d.name.length > 0 && d.dayNumber <= daysPerWeek)
+        .sort((a, b) => a.dayNumber - b.dayNumber),
+    [dayNames, daysPerWeek],
+  );
+
+  const daysWithoutExercises = useMemo(
+    () =>
+      emptyDays(
+        daysPerWeek,
+        drafts.map((d) => d.dayNumber),
+      ),
+    [daysPerWeek, drafts],
   );
 
   /**
@@ -216,6 +245,8 @@ export function NewMesoSheet({
     setWeeks(6);
     setAggressiveness('Media');
     setGoal('hipertrofia');
+    setDaysPerWeek(1);
+    setDayNames({});
     setDrafts([]);
     setQuery('');
     setError(null);
@@ -225,6 +256,18 @@ export function NewMesoSheet({
   function close() {
     reset();
     onClose();
+  }
+
+  /**
+   * Cambiar los días por semana no deja ejercicios en un día que ya no existe:
+   * los que quedaban más allá pasan al último. Es solo el borrador; el
+   * servidor nunca mueve nada por su cuenta.
+   */
+  function changeDaysPerWeek(n: number) {
+    setDaysPerWeek(n);
+    setDrafts((current) =>
+      current.map((d) => (d.dayNumber > n ? { ...d, dayNumber: n } : d)),
+    );
   }
 
   function toggle(item: ExerciseCatalogOut) {
@@ -239,6 +282,7 @@ export function NewMesoSheet({
           catalogId: item.id,
           name: item.name,
           muscle: item.muscle,
+          dayNumber: 1,
           // Del objetivo, no del catálogo: el mismo ejercicio se entrena
           // distinto según lo que se busque.
           repLo: preset.repLo,
@@ -280,7 +324,13 @@ export function NewMesoSheet({
         totalWeeks: weeks,
         aggressiveness,
         goal,
-        exercises: drafts.map(({ name: _n, muscle: _m, ...rest }) => rest),
+        daysPerWeek,
+        days: namedDays,
+        // Orden estable por día: la posición dentro de cada día es el orden
+        // en que se eligieron.
+        exercises: [...drafts]
+          .sort((a, b) => a.dayNumber - b.dayNumber)
+          .map(({ name: _n, muscle: _m, ...rest }) => rest),
       });
       if (thenPautar) {
         setCreatedMesoId(meso.id);
@@ -306,7 +356,7 @@ export function NewMesoSheet({
     step === 1
       ? athleteId !== null
       : step === 2
-        ? drafts.length > 0
+        ? drafts.length > 0 && daysWithoutExercises.length === 0
         : drafts.every((d) => missingWeeksFor(d, weeks).length === 0);
 
   return (
@@ -403,6 +453,21 @@ export function NewMesoSheet({
                 recorta el volumen.
               </Text>
 
+              <Text style={styles.label}>DÍAS POR SEMANA</Text>
+              <View style={styles.chips}>
+                {DAYS_PER_WEEK.map((n) => (
+                  <Chip
+                    key={n}
+                    label={String(n)}
+                    active={daysPerWeek === n}
+                    onPress={() => changeDaysPerWeek(n)}
+                  />
+                ))}
+              </View>
+              <Text style={styles.help}>
+                El reparto de ejercicios entre los días es fijo para todo el bloque.
+              </Text>
+
               <Text style={styles.label}>AGRESIVIDAD</Text>
               <View style={styles.chips}>
                 {AGGRESSIVENESS.map((a) => (
@@ -420,6 +485,22 @@ export function NewMesoSheet({
 
           {step === 2 ? (
             <>
+              <Text style={styles.label}>NOMBRE DE CADA DÍA (OPCIONAL)</Text>
+              {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
+                <View key={n} style={styles.dayNameRow}>
+                  <Text style={styles.dayNameLabel}>Día {n} ·</Text>
+                  <TextInput
+                    style={[styles.input, styles.dayNameInput]}
+                    value={dayNames[n] ?? ''}
+                    onChangeText={(t) => setDayNames((cur) => ({ ...cur, [n]: t }))}
+                    placeholder="Empuje, Pierna..."
+                    placeholderTextColor={color.textFaint}
+                    maxLength={40}
+                    accessibilityLabel={`Nombre del día ${n}`}
+                  />
+                </View>
+              ))}
+
               <TextInput
                 style={styles.input}
                 value={query}
@@ -434,6 +515,14 @@ export function NewMesoSheet({
                   ? 'Elegí los ejercicios del bloque.'
                   : `${drafts.length} elegidos.`}
               </Text>
+              {daysWithoutExercises.length > 0 ? (
+                <Text style={styles.error}>
+                  {daysWithoutExercises.length === 1 ? 'El día' : 'Los días'}{' '}
+                  {daysWithoutExercises.join(', ')} se queda
+                  {daysWithoutExercises.length === 1 ? '' : 'n'} sin ejercicios. Asigna
+                  al menos uno a cada día.
+                </Text>
+              ) : null}
 
               {catalog.loading && catalog.data === null ? (
                 <ActivityIndicator color={color.accent} style={{ marginTop: space.lg }} />
@@ -452,9 +541,10 @@ export function NewMesoSheet({
 
                   {group.items.map((item) => {
                     const on = chosen.has(item.id);
+                    const draft = drafts.find((d) => d.catalogId === item.id);
                     return (
+                      <View key={item.id} style={styles.pick}>
                       <Pressable
-                        key={item.id}
                         onPress={() => toggle(item)}
                         accessibilityRole="button"
                         accessibilityLabel={`${on ? 'Quitar' : 'Añadir'} ${item.name}`}
@@ -474,6 +564,19 @@ export function NewMesoSheet({
                           <Text style={styles.rowMeta}>{item.equipment}</Text>
                         </View>
                       </Pressable>
+                      {on && draft !== undefined && daysPerWeek > 1 ? (
+                        <View style={styles.dayChips}>
+                          {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
+                            <Chip
+                              key={n}
+                              label={`D${n}`}
+                              active={draft.dayNumber === n}
+                              onPress={() => patch(item.id, { dayNumber: n })}
+                            />
+                          ))}
+                        </View>
+                      ) : null}
+                      </View>
                     );
                   })}
                 </View>
@@ -490,7 +593,12 @@ export function NewMesoSheet({
                 el motor progresa desde ahí, o los fijás luego desde la tabla.
               </Text>
 
-              {drafts.map((d) => {
+              {groupByDay(drafts).map((group) => (
+                <View key={group.dayNumber} style={styles.dayGroup}>
+                  <Text style={styles.groupTitle}>
+                    {dayHeading(group.dayNumber, namedDays)}
+                  </Text>
+                  {group.items.map((d) => {
                 const missing = missingWeeksFor(d, weeks);
                 const isBasico = d.muscle === 'BASICOS';
                 return (
@@ -539,7 +647,9 @@ export function NewMesoSheet({
                     )}
                   </View>
                 );
-              })}
+                  })}
+                </View>
+              ))}
 
               {error !== null ? <Text style={styles.error}>{error}</Text> : null}
             </>
@@ -793,6 +903,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
   },
 
+  dayNameRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  dayNameLabel: { color: color.textMuted, fontSize: 13, width: 58 },
+  dayNameInput: { flex: 1, paddingVertical: 8 },
+  pick: { gap: 5 },
+  dayChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingLeft: 29 },
+  dayGroup: { gap: space.sm, marginTop: space.sm },
   group: { gap: 5, marginTop: space.sm },
   groupHead: {
     flexDirection: 'row',

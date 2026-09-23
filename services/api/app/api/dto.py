@@ -147,8 +147,23 @@ class WeekLoadIn(ApiModel):
         return self
 
 
+class MesocycleDayIn(ApiModel):
+    """El nombre opcional de un dia ("Empuje"). Sin nombre no se manda nada."""
+
+    day_number: int = Field(ge=1, le=7)
+    name: str = Field(min_length=1, max_length=40)
+
+
+class MesocycleDayOut(ApiModel):
+    day_number: int
+    name: str
+
+
 class MesocycleExerciseIn(ApiModel):
     catalog_id: uuid.UUID
+    #: Dia de la semana al que va. El tope contra `daysPerWeek` lo valida el
+    #: endpoint: aqui solo se sabe el maximo absoluto.
+    day_number: int = Field(default=1, ge=1, le=7)
     rep_lo: int = Field(ge=1, le=100)
     rep_hi: int = Field(ge=1, le=100)
     target_rir: int = Field(ge=0, le=10)
@@ -171,7 +186,30 @@ class MesocycleIn(ApiModel):
     total_weeks: int = Field(default=6, ge=2, le=24)
     aggressiveness: Aggressiveness = Aggressiveness.MEDIUM
     goal: TrainingGoal = TrainingGoal.HYPERTROPHY
+    days_per_week: int = Field(default=1, ge=1, le=7)
+    days: list[MesocycleDayIn] = Field(default_factory=list, max_length=7)
     exercises: list[MesocycleExerciseIn] = Field(min_length=1, max_length=40)
+
+
+class DayExerciseIn(ApiModel):
+    """Donde queda un ejercicio del mesociclo tras editar el reparto."""
+
+    exercise_id: uuid.UUID
+    day_number: int = Field(ge=1, le=7)
+    position: int = Field(ge=0, le=100)
+
+
+class MesocycleDaysIn(ApiModel):
+    """Cuerpo de `PUT /mesocycles/{id}/days`.
+
+    `days` son TODOS los nombres que debe haber al terminar (un dia que no
+    aparezca se queda sin nombre). `exercises` solo lista los que se mueven:
+    los que no aparezcan conservan su dia y su posicion.
+    """
+
+    days_per_week: int = Field(ge=1, le=7)
+    days: list[MesocycleDayIn] = Field(default_factory=list, max_length=7)
+    exercises: list[DayExerciseIn] = Field(default_factory=list, max_length=40)
 
 
 class PrescriptionIn(ApiModel):
@@ -208,6 +246,7 @@ class PrescriptionOut(PrescriptionIn):
 
 class MesocycleExerciseOut(ApiModel):
     id: uuid.UUID
+    day_number: int
     position: int
     name: str
     muscle: str
@@ -238,6 +277,8 @@ class MesocycleSummaryOut(ApiModel):
     goal: str
     status: str
     exercise_count: int
+    days_per_week: int
+    days: list[MesocycleDayOut]
 
 
 class MesocycleOut(ApiModel):
@@ -250,6 +291,8 @@ class MesocycleOut(ApiModel):
     aggressiveness: str
     goal: str
     status: str
+    days_per_week: int
+    days: list[MesocycleDayOut]
     exercises: list[MesocycleExerciseOut]
 
 
@@ -258,7 +301,10 @@ class MesocycleOut(ApiModel):
 
 class SessionCreate(ApiModel):
     week_number: int = Field(ge=1, le=24)
-    day_label: str = Field(min_length=1, max_length=60)
+    day_number: int = Field(ge=1, le=7)
+    #: Opcional: si no viene, se rellena con el nombre del dia o "Dia N". Si
+    #: viene, gana (compatibilidad con clientes que lo mandaban a mano).
+    day_label: str | None = Field(default=None, min_length=1, max_length=60)
 
 
 class PlannedSetOut(ApiModel):
@@ -305,11 +351,31 @@ class SessionOut(ApiModel):
     id: uuid.UUID
     mesocycle_id: uuid.UUID
     week_number: int
+    day_number: int
     day_label: str
     is_deload: bool
     started_at: datetime | None
     completed_at: datetime | None
     exercises: list[SessionExerciseOut]
+
+
+class NextUpOut(ApiModel):
+    """Lo que le toca entrenar al atleta. Lo calcula el servidor, nunca el cliente."""
+
+    week_number: int
+    day_number: int
+    #: null si el coach no le puso nombre al dia: la app pinta "Dia N".
+    day_name: str | None
+
+
+class CurrentSessionOut(ApiModel):
+    """La sesion abierta y, si no hay ninguna, cual toca abrir."""
+
+    session: SessionOut | None
+    next: NextUpOut | None
+    #: True si el atleta tiene mesociclo y ya hizo todos sus dias. Distingue
+    #: "bloque terminado" de "sin mesociclo", que ambos llegan con next null.
+    finished: bool = False
 
 
 class SetLogIn(ApiModel):
@@ -537,6 +603,7 @@ class PlanRowOut(ApiModel):
     """Un ejercicio, con sus N semanas."""
 
     mesocycle_exercise_id: uuid.UUID
+    day_number: int
     name: str
     muscle: str
     equipment: str
@@ -556,6 +623,9 @@ class PlanGridOut(ApiModel):
     goal: str
     total_weeks: int
     current_week_index: int
+    days_per_week: int
+    days: list[MesocycleDayOut]
+    #: Ordenadas por (dia, posicion): la app agrupa bajo un encabezado por dia.
     rows: list[PlanRowOut]
 
 

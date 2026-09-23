@@ -11,6 +11,7 @@ import type {
   AthleteCardOut,
   AthleteSummaryOut,
   CoachOverviewOut,
+  CurrentSessionOut,
   ExerciseCatalogOut,
   FeedbackIn,
   MesocycleIn,
@@ -141,27 +142,40 @@ export async function setPrescription(
 
 // ── Sesiones ────────────────────────────────────────────────────────────────
 
+/**
+ * El coach genera la sesión de un día de su atleta. El título sale solo: el
+ * nombre del día si lo tiene, "Día N" si no.
+ */
 export async function createSession(
   mesocycleId: string,
   weekNumber: number,
-  dayLabel: string,
+  dayNumber: number,
 ): Promise<SessionOut> {
   return request<SessionOut>(`/mesocycles/${mesocycleId}/sessions`, {
     method: 'POST',
-    body: { weekNumber, dayLabel },
+    body: { weekNumber, dayNumber },
   });
 }
 
 /**
- * La sesión abierta del atleta, o null si hoy no le toca.
+ * El atleta abre SU día. No manda semana ni día: los calcula el servidor, para
+ * que el atleta no elija qué entrenar. Si ya tiene una abierta, devuelve esa.
+ */
+export async function openNextSession(): Promise<SessionOut> {
+  return request<SessionOut>('/sessions/next', { method: 'POST' });
+}
+
+/**
+ * La sesión abierta del atleta y, si no hay ninguna, qué día le toca abrir.
  *
- * Null y no un error: "hoy no entrenas" es una respuesta normal del producto.
+ * `session: null` y no un error: "hoy no hay nada abierto" es una respuesta
+ * normal del producto.
  */
 export async function currentSession(
   athleteId?: string,
-): Promise<SessionOut | null> {
+): Promise<CurrentSessionOut> {
   const query = athleteId === undefined ? '' : `?athleteId=${athleteId}`;
-  return request<SessionOut | null>(`/sessions/current${query}`);
+  return request<CurrentSessionOut>(`/sessions/current${query}`);
 }
 
 export async function getSession(id: string): Promise<SessionOut> {

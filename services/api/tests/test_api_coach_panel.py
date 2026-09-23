@@ -76,7 +76,7 @@ async def _entrenar(
     s = await client.post(
         f"/api/v1/mesocycles/{gym['meso']['id']}/sessions",
         headers=gym["ca"],
-        json={"weekNumber": semana, "dayLabel": f"Push {semana}"},
+        json={"weekNumber": semana, "dayNumber": 1, "dayLabel": f"Push {semana}"},
     )
     assert s.status_code == 201, s.text
     data = s.json()

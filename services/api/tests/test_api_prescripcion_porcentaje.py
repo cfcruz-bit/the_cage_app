@@ -106,7 +106,7 @@ async def _sesion(client: AsyncClient, b: dict, semana: int = 3) -> object:
     return await client.post(
         f"/api/v1/mesocycles/{b['meso']['id']}/sessions",
         headers=b["ca"],
-        json={"weekNumber": semana, "dayLabel": "Sentadilla"},
+        json={"weekNumber": semana, "dayNumber": 1, "dayLabel": "Sentadilla"},
     )
 
 

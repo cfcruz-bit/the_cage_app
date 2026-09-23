@@ -193,6 +193,7 @@ class Mesocycle(Base, TimestampMixin):
             "current_week_index >= 0 AND current_week_index < total_weeks",
             name="semana_actual_dentro_del_bloque",
         ),
+        CheckConstraint("days_per_week >= 1 AND days_per_week <= 7", name="dias_por_semana"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
@@ -219,11 +220,42 @@ class Mesocycle(Base, TimestampMixin):
     )
     started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    #: Cuantos dias de entrenamiento tiene cada semana. El reparto de ejercicios
+    #: entre esos dias es fijo para todo el bloque (`MesocycleExercise.day_number`).
+    days_per_week: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
     exercises: Mapped[list[MesocycleExercise]] = relationship(
         back_populates="mesocycle",
         cascade="all, delete-orphan",
-        order_by="MesocycleExercise.position",
+        order_by="MesocycleExercise.day_number, MesocycleExercise.position",
     )
+    days: Mapped[list[MesocycleDay]] = relationship(
+        cascade="all, delete-orphan",
+        order_by="MesocycleDay.day_number",
+    )
+
+
+class MesocycleDay(Base, TimestampMixin):
+    """El nombre de un dia de entrenamiento ("Empuje"). Solo si el coach lo puso.
+
+    Sin nombre no hay fila: el dia se llama "Dia N" y no hace falta guardarlo.
+    Es tabla aparte y no una columna de `mesocycle_exercises` porque el nombre
+    es del DIA, no del ejercicio: repetido en cada ejercicio, dos filas del
+    mismo dia podrian acabar diciendo cosas distintas.
+    """
+
+    __tablename__ = "mesocycle_days"
+    __table_args__ = (
+        UniqueConstraint("mesocycle_id", "day_number"),
+        CheckConstraint("day_number >= 1", name="dia_positivo"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
+    mesocycle_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("mesocycles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    day_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
 
 
 class MesocycleExercise(Base, TimestampMixin):
@@ -231,7 +263,9 @@ class MesocycleExercise(Base, TimestampMixin):
 
     __tablename__ = "mesocycle_exercises"
     __table_args__ = (
-        UniqueConstraint("mesocycle_id", "position"),
+        # El orden es dentro del dia, no del bloque entero.
+        UniqueConstraint("mesocycle_id", "day_number", "position"),
+        CheckConstraint("day_number >= 1", name="dia_positivo"),
         CheckConstraint("rep_lo >= 1 AND rep_hi >= rep_lo", name="rango_reps"),
         CheckConstraint("target_rir >= 0 AND target_rir <= 10", name="rir_valido"),
         CheckConstraint("load_increment_kg > 0", name="incremento_positivo"),
@@ -248,6 +282,10 @@ class MesocycleExercise(Base, TimestampMixin):
     catalog_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("exercise_catalog.id", ondelete="RESTRICT"), nullable=False
     )
+    #: Dia de la semana al que pertenece, de 1 a `Mesocycle.days_per_week`. El
+    #: tope NO puede ser un CHECK (esta en otra fila): lo valida la API.
+    day_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    #: Orden dentro de ese dia.
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
     rep_lo: Mapped[int] = mapped_column(Integer, nullable=False)

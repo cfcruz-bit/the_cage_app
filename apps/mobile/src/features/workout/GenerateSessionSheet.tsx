@@ -6,8 +6,8 @@
  * feedback que el atleta reportó, y las **congela**. A partir de ahí, esa
  * sesión ya no cambia aunque cambien las reglas.
  *
- * El día se escribe a mano —"Push A", "Piernas"— porque es lo que el atleta
- * verá como título y el coach sabe cómo llama a sus días mejor que nosotros.
+ * El día se elige entre los del mesociclo (D1, D2...). El título que ve el
+ * atleta sale solo: el nombre que el coach le puso al día, o "Día N".
  */
 
 import { useCallback, useState } from 'react';
@@ -27,6 +27,7 @@ import { ApiError } from '@/api/client';
 import { createSession, listMesocycles } from '@/api/endpoints';
 import type { MesocycleSummaryOut } from '@/api/types';
 import { Chip } from '@/components/Chip';
+import { dayLabel } from '@/lib/days';
 import { useRemote } from '@/lib/remote';
 import { color, palette, radius, space } from '@/theme/tokens';
 
@@ -46,7 +47,7 @@ export function GenerateSessionSheet({
 
   const [mesoId, setMesoId] = useState<string | null>(null);
   const [week, setWeek] = useState('1');
-  const [dayLabel, setDayLabel] = useState('');
+  const [day, setDay] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,8 +70,7 @@ export function GenerateSessionSheet({
     setBusy(true);
     setError(null);
     try {
-      await createSession(chosen.id, weekNumber, dayLabel.trim() || 'Sesión');
-      setDayLabel('');
+      await createSession(chosen.id, weekNumber, day);
       onCreated();
     } catch (e) {
       setError(
@@ -117,6 +117,7 @@ export function GenerateSessionSheet({
                   active={mesoId === m.id}
                   onPress={() => {
                     setMesoId(m.id);
+                    setDay(1);
                     // La semana en curso del bloque es la respuesta correcta
                     // casi siempre; se deja editable por si no lo es.
                     setWeek(String(m.currentWeekIndex + 1));
@@ -141,15 +142,23 @@ export function GenerateSessionSheet({
           ) : null}
 
           <Text style={styles.label}>DÍA</Text>
-          <TextInput
-            style={styles.input}
-            value={dayLabel}
-            onChangeText={setDayLabel}
-            placeholder="Push A"
-            placeholderTextColor={color.textFaint}
-            accessibilityLabel="Nombre del día"
-          />
-          <Text style={styles.help}>Es el título que va a ver el atleta.</Text>
+          {chosen !== null ? (
+            <View style={styles.chips}>
+              {Array.from({ length: chosen.daysPerWeek }, (_, i) => i + 1).map((n) => (
+                <Chip
+                  key={n}
+                  label={dayLabel(n, chosen.days)}
+                  active={day === n}
+                  onPress={() => setDay(n)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.help}>Elige primero el mesociclo.</Text>
+          )}
+          <Text style={styles.help}>
+            Si ese día ya tiene una sesión abierta esa semana, se abre la misma.
+          </Text>
 
           {error !== null ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>

@@ -68,7 +68,7 @@ async def _nueva_sesion(client: AsyncClient, e: dict, semana: int = 1) -> dict:
     r = await client.post(
         f"/api/v1/mesocycles/{e['meso']['id']}/sessions",
         headers=e["ca"],
-        json={"weekNumber": semana, "dayLabel": "Push A"},
+        json={"weekNumber": semana, "dayNumber": 1, "dayLabel": "Push A"},
     )
     assert r.status_code == 201, r.text
     return r.json()
@@ -280,7 +280,7 @@ async def test_la_semana_fuera_del_bloque_se_rechaza(
     r = await client.post(
         f"/api/v1/mesocycles/{entorno['meso']['id']}/sessions",
         headers=entorno["ca"],
-        json={"weekNumber": 9, "dayLabel": "Push A"},
+        json={"weekNumber": 9, "dayNumber": 1, "dayLabel": "Push A"},
     )
     assert r.status_code == 400
 
@@ -293,7 +293,7 @@ async def test_sin_sesion_abierta_devuelve_null(client: AsyncClient, entorno: di
     """ "Hoy no te toca" es una respuesta normal, no un error."""
     r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
     assert r.status_code == 200
-    assert r.json() is None
+    assert r.json()["session"] is None
 
 
 @pytest.mark.asyncio
@@ -304,7 +304,7 @@ async def test_el_atleta_encuentra_su_sesion_abierta(
 
     r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
     assert r.status_code == 200
-    assert r.json()["id"] == creada["id"]
+    assert r.json()["session"]["id"] == creada["id"]
 
 
 @pytest.mark.asyncio
@@ -316,7 +316,7 @@ async def test_una_sesion_cerrada_ya_no_es_la_actual(
     await client.post(f"/api/v1/sessions/{creada['id']}/complete", headers=entorno["aa"])
 
     r = await client.get("/api/v1/sessions/current", headers=entorno["aa"])
-    assert r.json() is None
+    assert r.json()["session"] is None
 
 
 @pytest.mark.asyncio
@@ -331,7 +331,7 @@ async def test_el_coach_puede_mirar_la_de_su_atleta(client: AsyncClient, entorno
         f"/api/v1/sessions/current?athleteId={athlete_id}", headers=entorno["ca"]
     )
     assert r.status_code == 200
-    assert r.json()["id"] == creada["id"]
+    assert r.json()["session"]["id"] == creada["id"]
 
 
 @pytest.mark.asyncio

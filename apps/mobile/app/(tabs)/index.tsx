@@ -35,6 +35,7 @@ import { FeedbackSheet } from '@/features/feedback/FeedbackSheet';
 import { RestTimer } from '@/features/workout/RestTimer';
 import { SessionExerciseCard } from '@/features/workout/SessionExerciseCard';
 import { GenerateSessionSheet } from '@/features/workout/GenerateSessionSheet';
+import { nextUpText } from '@/lib/days';
 import { useApp } from '@/stores/app';
 import { useSession } from '@/stores/session';
 import { useSync } from '@/stores/sync';
@@ -52,6 +53,9 @@ export default function WorkoutScreen() {
   const marks = useWorkout((s) => s.marks);
   const feedbackDone = useWorkout((s) => s.feedbackDone);
   const load = useWorkout((s) => s.load);
+  const next = useWorkout((s) => s.next);
+  const finished = useWorkout((s) => s.finished);
+  const openNext = useWorkout((s) => s.openNext);
   const toggleSet = useWorkout((s) => s.toggleSet);
   const reportSet = useWorkout((s) => s.reportSet);
   const saveFeedback = useWorkout((s) => s.saveFeedback);
@@ -139,15 +143,48 @@ export default function WorkoutScreen() {
     return (
       <Screen title="SESIÓN DE HOY">
         <View style={styles.center}>
-          <Ionicons name="barbell-outline" size={30} color={color.textFaint} />
-          <Text style={styles.emptyTitle}>
-            {error ?? 'Nada programado todavía'}
-          </Text>
-          <Text style={styles.emptyBody}>
-            {isCoach
-              ? 'Generá la sesión del día para tu atleta desde un mesociclo activo.'
-              : 'Tu coach todavía no te generó la sesión de hoy. En cuanto lo haga, aparece acá.'}
-          </Text>
+          {!isCoach && next !== null ? (
+            // El atleta no elige qué entrenar: el servidor le dice qué día toca.
+            <>
+              <Ionicons name="barbell-outline" size={30} color={color.accent} />
+              <Text style={styles.emptyTitle}>{nextUpText(next)}</Text>
+              <Text style={styles.emptyBody}>
+                {error ?? 'Es tu siguiente día del mesociclo.'}
+              </Text>
+              <Pressable
+                onPress={() => void openNext()}
+                disabled={loading}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.action,
+                  loading && { opacity: 0.5 },
+                  pressed && !loading && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={styles.actionText}>EMPEZAR</Text>
+              </Pressable>
+            </>
+          ) : !isCoach && finished ? (
+            <>
+              <Ionicons name="trophy-outline" size={30} color={color.accent} />
+              <Text style={styles.emptyTitle}>Bloque completado</Text>
+              <Text style={styles.emptyBody}>
+                Hiciste todos los días de tu mesociclo. Tu coach te prepara el siguiente.
+              </Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="barbell-outline" size={30} color={color.textFaint} />
+              <Text style={styles.emptyTitle}>
+                {error ?? 'Nada programado todavía'}
+              </Text>
+              <Text style={styles.emptyBody}>
+                {isCoach
+                  ? 'Generá la sesión del día para tu atleta desde un mesociclo activo.'
+                  : 'Todavía no tienes un mesociclo activo. En cuanto tu coach lo cree, aparece acá.'}
+              </Text>
+            </>
+          )}
 
           {isCoach ? (
             <Pressable
@@ -157,7 +194,7 @@ export default function WorkoutScreen() {
             >
               <Text style={styles.actionText}>GENERAR SESIÓN</Text>
             </Pressable>
-          ) : (
+          ) : next === null && !finished ? (
             <Pressable
               onPress={() => void load()}
               accessibilityRole="button"
@@ -165,7 +202,7 @@ export default function WorkoutScreen() {
             >
               <Text style={styles.emptyBody}>Comprobar de nuevo</Text>
             </Pressable>
-          )}
+          ) : null}
         </View>
 
         {isCoach ? (

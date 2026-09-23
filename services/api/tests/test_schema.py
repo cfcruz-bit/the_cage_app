@@ -38,6 +38,7 @@ EXPECTED_TABLES = {
     "exercise_catalog",
     "exercise_feedback",
     "memberships",
+    "mesocycle_days",
     "mesocycle_exercises",
     "mesocycles",
     "one_rep_maxes",

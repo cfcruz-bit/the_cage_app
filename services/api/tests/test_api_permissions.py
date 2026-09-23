@@ -150,7 +150,7 @@ async def test_el_atleta_no_genera_sus_propias_sesiones(
     r = await client.post(
         f"/api/v1/mesocycles/{mundo.meso['id']}/sessions",
         headers=mundo.aa,
-        json={"weekNumber": 1, "dayLabel": "Push A"},
+        json={"weekNumber": 1, "dayNumber": 1, "dayLabel": "Push A"},
     )
     assert r.status_code == 404
 

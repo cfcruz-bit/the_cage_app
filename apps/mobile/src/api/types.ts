@@ -83,8 +83,17 @@ export interface PrescriptionOut {
   needsOneRm: boolean;
 }
 
+/** El nombre que el coach le puso a un día ("Empuje"). Sin nombre no hay fila. */
+export interface MesocycleDayOut {
+  dayNumber: number;
+  name: string;
+}
+
 export interface MesocycleExerciseOut {
   id: string;
+  /** Día de la semana al que pertenece, de 1 a `daysPerWeek`. */
+  dayNumber: number;
+  /** Orden dentro de su día. */
   position: number;
   name: string;
   muscle: string;
@@ -116,6 +125,8 @@ export interface MesocycleSummaryOut {
   goal: TrainingGoal;
   status: 'draft' | 'active' | 'completed' | 'archived';
   exerciseCount: number;
+  daysPerWeek: number;
+  days: MesocycleDayOut[];
 }
 
 /** Una fila del paso 4 opcional: la carga de UNA semana de UN ejercicio. */
@@ -132,6 +143,8 @@ export interface WeekLoadIn {
 /** Lo que el coach manda al crear un mesociclo. */
 export interface MesocycleExerciseIn {
   catalogId: string;
+  /** Día de la semana al que va (1..daysPerWeek). */
+  dayNumber: number;
   repLo: number;
   repHi: number;
   targetRir: number;
@@ -151,6 +164,9 @@ export interface MesocycleIn {
   totalWeeks: number;
   aggressiveness: Aggressiveness;
   goal: TrainingGoal;
+  daysPerWeek: number;
+  /** Solo los días que tienen nombre. */
+  days: MesocycleDayOut[];
   exercises: MesocycleExerciseIn[];
 }
 
@@ -164,6 +180,8 @@ export interface MesocycleOut {
   aggressiveness: Aggressiveness;
   goal: TrainingGoal;
   status: 'draft' | 'active' | 'completed' | 'archived';
+  daysPerWeek: number;
+  days: MesocycleDayOut[];
   exercises: MesocycleExerciseOut[];
 }
 
@@ -209,11 +227,28 @@ export interface SessionOut {
   id: string;
   mesocycleId: string;
   weekNumber: number;
+  dayNumber: number;
   dayLabel: string;
   isDeload: boolean;
   startedAt: string | null;
   completedAt: string | null;
   exercises: SessionExerciseOut[];
+}
+
+/** Lo que le toca entrenar al atleta. Lo calcula el servidor, nunca la app. */
+export interface NextUpOut {
+  weekNumber: number;
+  dayNumber: number;
+  /** null si el coach no le puso nombre al día: se pinta "Día N". */
+  dayName: string | null;
+}
+
+/** La sesión abierta y, si no hay ninguna, cuál toca abrir. */
+export interface CurrentSessionOut {
+  session: SessionOut | null;
+  next: NextUpOut | null;
+  /** Tiene bloque y ya hizo todos sus días (`next` null por eso, no por no tener bloque). */
+  finished: boolean;
 }
 
 /** Lo que sube el teléfono. `clientId` es la clave de idempotencia. */
@@ -336,6 +371,7 @@ export interface PlanCellOut {
 
 export interface PlanRowOut {
   mesocycleExerciseId: string;
+  dayNumber: number;
   name: string;
   muscle: string;
   equipment: string;
@@ -348,6 +384,9 @@ export interface PlanGridOut {
   goal: TrainingGoal;
   totalWeeks: number;
   currentWeekIndex: number;
+  daysPerWeek: number;
+  days: MesocycleDayOut[];
+  /** Ordenadas por (día, posición). */
   rows: PlanRowOut[];
 }
 

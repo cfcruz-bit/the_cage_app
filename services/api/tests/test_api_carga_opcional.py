@@ -75,7 +75,7 @@ async def _sesion(client: AsyncClient, m: dict, meso_id: str, semana: int = 1):
     return await client.post(
         f"/api/v1/mesocycles/{meso_id}/sessions",
         headers=m["ca"],
-        json={"weekNumber": semana, "dayLabel": "Brazo"},
+        json={"weekNumber": semana, "dayNumber": 1, "dayLabel": "Brazo"},
     )
 
 

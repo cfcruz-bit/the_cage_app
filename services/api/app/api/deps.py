@@ -54,6 +54,11 @@ SOLO_COACH = HTTPException(
     detail="Esta accion solo la puede hacer un coach",
 )
 
+SOLO_ATLETA = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="Esta accion solo la puede hacer un atleta",
+)
+
 NO_ENCONTRADO = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
     detail="No encontrado",

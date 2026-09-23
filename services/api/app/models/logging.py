@@ -45,6 +45,7 @@ class TrainingSession(Base, TimestampMixin):
     __tablename__ = "training_sessions"
     __table_args__ = (
         CheckConstraint("week_number >= 1", name="semana_positiva"),
+        CheckConstraint("day_number >= 1", name="dia_positivo"),
         CheckConstraint(
             "completed_at IS NULL OR started_at IS NOT NULL",
             name="no_se_cierra_sin_abrir",
@@ -57,6 +58,10 @@ class TrainingSession(Base, TimestampMixin):
     )
 
     week_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Dia del mesociclo (1..days_per_week). `day_label` es texto libre y en los
+    #: mesociclos viejos dice cualquier cosa: sin esto no se sabe que dias de la
+    #: semana faltan.
+    day_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     day_label: Mapped[str] = mapped_column(String(60), nullable=False)
     is_deload: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

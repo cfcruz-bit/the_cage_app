@@ -2,7 +2,9 @@
 
 Reparto de autoridad en este archivo:
 
-- **Generar** una sesion: el coach. Es donde el motor decide carga y volumen.
+- **Generar** una sesion: el coach (`POST /mesocycles/{id}/sessions`) o el atleta
+  abriendo SU dia (`POST /sessions/next`). Es donde el motor decide carga y
+  volumen; las dos puertas comparten `app.services.schedule.generate_session`.
 - **Registrar sets** y **dar feedback**: el atleta (su coach tambien puede,
   para corregir un registro).
 - **Cerrar** la sesion: cualquiera de los dos.
@@ -17,18 +19,21 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import (
     NO_ENCONTRADO,
+    SOLO_ATLETA,
     ActiveUser,
     SessionDep,
     coach_leads_athlete,
 )
 from app.api.dto import (
+    CurrentSessionOut,
     FeedbackIn,
+    NextUpOut,
     PlannedSetOut,
     SessionCreate,
     SessionExerciseOut,
@@ -36,8 +41,6 @@ from app.api.dto import (
     SetLogBatch,
     SyncResult,
 )
-from app.domain.policy import POLICY_VERSION
-from app.domain.schemas import Aggressiveness
 from app.models import (
     ExerciseFeedback,
     Mesocycle,
@@ -48,16 +51,17 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import (
-    FIRST_SESSION_WHY,
-    effective_prescription,
     last_performance,
-    resolve_plan,
-    resolve_without_history,
     rest_seconds_for,
     sets_for,
     to_domain_exercise,
 )
-from app.services.records import current_marks
+from app.services.schedule import (
+    active_mesocycle,
+    generate_session,
+    next_up,
+    open_session,
+)
 
 router = APIRouter(tags=["sessions"])
 
@@ -93,14 +97,15 @@ ReadableSession = Annotated[TrainingSession, Depends(_readable_session)]
 async def create_session(
     mesocycle_id: uuid.UUID,
     body: SessionCreate,
+    response: Response,
     session: SessionDep,
     user: ActiveUser,
 ) -> SessionOut:
-    """Genera la sesion del dia con el motor y la CONGELA.
+    """El coach genera la sesion de un dia de su atleta.
 
-    Congelar es la parte importante: carga, sets y `policy_version` quedan
-    escritos. No se recalculan al leer. Si manana cambian las reglas, esta
-    sesion sigue contando lo que de verdad se entreno.
+    Si ese dia ya tiene una sesion sin cerrar en esa semana la devuelve (200) en
+    vez de crear una segunda: el coach solo quiere abrirla. La generacion en si
+    esta en `app.services.schedule`, compartida con `POST /sessions/next`.
     """
     meso = await session.get(Mesocycle, mesocycle_id)
     if meso is None:
@@ -109,96 +114,49 @@ async def create_session(
         session, user.id, meso.athlete_id
     ):
         raise NO_ENCONTRADO
-    if body.week_number > meso.total_weeks:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Esa semana esta fuera del mesociclo",
-        )
 
-    ts = TrainingSession(
-        mesocycle_id=meso.id,
-        week_number=body.week_number,
-        day_label=body.day_label,
-        is_deload=body.week_number == meso.total_weeks,
-        started_at=datetime.now(UTC),
+    ts, created = await generate_session(
+        session, meso, body.week_number, body.day_number, body.day_label
     )
-    session.add(ts)
-    await session.flush()
-
-    found = await session.execute(
-        select(MesocycleExercise)
-        .where(MesocycleExercise.mesocycle_id == meso.id)
-        .order_by(MesocycleExercise.position)
-        .options(
-            selectinload(MesocycleExercise.catalog),
-            selectinload(MesocycleExercise.prescriptions),
-        )
-    )
-    mexs = list(found.scalars())
-    aggressiveness = Aggressiveness(meso.aggressiveness)
-    marks = await current_marks(session, meso.athlete_id)
-
-    # Se valida ANTES de generar nada: si un ejercicio pautado por % no tiene
-    # marca, la sesion no se genera a medias con el resto de ejercicios ya
-    # escritos. Como aun no hubo commit, el rollback de `get_session` deshace
-    # tambien la fila de `ts` de arriba.
-    for mex in mexs:
-        p = effective_prescription(mex, body.week_number)
-        if p is not None and p.load_percent is not None and mex.catalog_id not in marks:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Falta la marca de {mex.catalog.name} para calcular el {p.load_percent:g}%"
-                ),
-            )
-
-    for mex in mexs:
-        last = await last_performance(session, mex)
-        mark = marks.get(mex.catalog_id)
-        one_rm_kg = mark.value_kg if mark is not None else None
-
-        if last is None:
-            # Sin ningun peso previo el motor no tiene de donde partir. Si el
-            # coach fijo uno para esta semana (kg o %) se usa directo; si no,
-            # el ejercicio sale en blanco y el atleta escribe el suyo.
-            load_kg, sets = resolve_without_history(mex, body.week_number, one_rm_kg)
-            session.add(
-                SessionExercise(
-                    session_id=ts.id,
-                    mesocycle_exercise_id=mex.id,
-                    position=mex.position,
-                    planned_load_kg=load_kg,
-                    planned_sets=sets,
-                    policy_version=POLICY_VERSION,
-                    why=FIRST_SESSION_WHY if load_kg is None else "carga pautada por tu coach",
-                )
-            )
-            continue
-
-        exercise = to_domain_exercise(
-            mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
-        )
-        plan, _suggestion = resolve_plan(
-            exercise, mex, aggressiveness, body.week_number, one_rm_kg=one_rm_kg
-        )
-
-        session.add(
-            SessionExercise(
-                session_id=ts.id,
-                mesocycle_exercise_id=mex.id,
-                position=mex.position,
-                planned_load_kg=plan.load_kg,
-                planned_sets=plan.sets,
-                policy_version=plan.policy_version,
-                why=plan.why,
-            )
-        )
-
     await session.commit()
+    if not created:
+        response.status_code = status.HTTP_200_OK
     return await _render(session, ts.id)
 
 
-@router.get("/sessions/current", response_model=SessionOut | None)
+@router.post("/sessions/next", response_model=SessionOut)
+async def open_next_session(
+    response: Response, session: SessionDep, user: ActiveUser
+) -> SessionOut:
+    """El atleta abre SU dia, sin esperar a que nadie se lo genere.
+
+    No recibe atleta, semana ni dia: los tres salen de `next_up`, calculado en
+    el servidor. Un endpoint que los aceptara seria uno donde el atleta elige
+    que entrenar. Tampoco escribe el plan: abre el dia que el coach ya pauto.
+    Pasa por `ActiveUser`, asi que con la membresia vencida da 402 como todo.
+    """
+    if user.role != UserRole.ATHLETE:
+        raise SOLO_ATLETA
+
+    abierta = await open_session(session, user.id)
+    if abierta is not None:
+        return await _render(session, abierta.id)
+
+    meso = await active_mesocycle(session, user.id)
+    nxt = await next_up(session, meso) if meso is not None else None
+    if meso is None or nxt is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No tienes ningun dia pendiente: tu mesociclo ya esta completado",
+        )
+
+    ts, _ = await generate_session(session, meso, nxt.week_number, nxt.day_number)
+    await session.commit()
+    response.status_code = status.HTTP_201_CREATED
+    return await _render(session, ts.id)
+
+
+@router.get("/sessions/current", response_model=CurrentSessionOut)
 async def current_session(
     session: SessionDep,
     user: ActiveUser,
@@ -206,39 +164,43 @@ async def current_session(
     # alias_generator de los DTO, asi que sin esto `athleteId` no se enlaza y
     # llega None en silencio.
     athlete_id: Annotated[uuid.UUID | None, Query(alias="athleteId")] = None,
-) -> SessionOut | None:
-    """La sesion abierta del atleta, si la hay.
+) -> CurrentSessionOut:
+    """La sesion abierta del atleta y, si no hay ninguna, que dia toca abrir.
 
     Es lo primero que pide el movil al abrir la pestana de entreno. Devuelve
-    `null` y no 404 cuando no hay ninguna: "hoy no te toca" es una respuesta
-    normal del producto, no un error, y un 404 obligaria a cada pantalla a
+    `session: null` y no 404 cuando no hay ninguna abierta: "hoy no te toca" es
+    una respuesta normal del producto, y un 404 obligaria a cada pantalla a
     distinguir entre "no hay sesion" y "algo se rompio".
 
-    Se busca la mas reciente SIN cerrar. Una sesion cerrada ya no se entrena;
-    se consulta desde el historial.
+    Se busca la mas reciente SIN cerrar. Con una abierta, `next` es null: lo que
+    toca es terminar esa. Sin ninguna, `next` sale de `next_up`, y `finished`
+    avisa de que el atleta tiene bloque pero ya no le queda ningun dia.
     """
     target = user.id
     if user.role == UserRole.COACH:
         if athlete_id is None:
-            return None
+            return CurrentSessionOut(session=None, next=None)
         if not await coach_leads_athlete(session, user.id, athlete_id):
             raise NO_ENCONTRADO
         target = athlete_id
 
-    found = await session.execute(
-        select(TrainingSession)
-        .join(Mesocycle, TrainingSession.mesocycle_id == Mesocycle.id)
-        .where(
-            Mesocycle.athlete_id == target,
-            TrainingSession.completed_at.is_(None),
+    ts = await open_session(session, target)
+    if ts is not None:
+        return CurrentSessionOut(session=await _render(session, ts.id), next=None)
+
+    meso = await active_mesocycle(session, target)
+    if meso is None:
+        return CurrentSessionOut(session=None, next=None)
+    nxt = await next_up(session, meso)
+    return CurrentSessionOut(
+        session=None,
+        next=NextUpOut(
+            week_number=nxt.week_number, day_number=nxt.day_number, day_name=nxt.day_name
         )
-        .order_by(TrainingSession.created_at.desc())
-        .limit(1)
+        if nxt is not None
+        else None,
+        finished=nxt is None,
     )
-    ts = found.scalar_one_or_none()
-    if ts is None:
-        return None
-    return await _render(session, ts.id)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionOut)
@@ -422,6 +384,7 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
         id=ts.id,
         mesocycle_id=ts.mesocycle_id,
         week_number=ts.week_number,
+        day_number=ts.day_number,
         day_label=ts.day_label,
         is_deload=ts.is_deload,
         started_at=ts.started_at,

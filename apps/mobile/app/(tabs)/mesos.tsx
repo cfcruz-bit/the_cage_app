@@ -41,6 +41,7 @@ import { Screen } from '@/components/Screen';
 import { NewMesoSheet } from '@/features/mesos/NewMesoSheet';
 import { PlanGrid } from '@/features/mesos/PlanGrid';
 import { VolumeChart } from '@/features/mesos/VolumeChart';
+import { layoutSummary } from '@/lib/days';
 import { formatNumber } from '@/lib/units';
 import { useRemote } from '@/lib/remote';
 import { useApp } from '@/stores/app';
@@ -127,6 +128,8 @@ function CoachList({ onOpen }: { onOpen: (id: string) => void }) {
                 {m.athleteName} · sem {m.currentWeekIndex + 1} de {m.totalWeeks} ·{' '}
                 {m.exerciseCount} ejercicios
               </Text>
+              {/* "3 días · D1 Empuje · D2 Pierna · D3 Tirón" */}
+              <Text style={styles.muscle}>{layoutSummary(m.daysPerWeek, m.days)}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={color.textFaint} />
           </Pressable>

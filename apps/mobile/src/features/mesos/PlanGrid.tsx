@@ -31,6 +31,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiError } from '@/api/client';
 import { planGrid, setPrescription } from '@/api/endpoints';
 import type { PlanCellOut, PlanGridOut, PlanRowOut } from '@/api/types';
+import { dayHeading, groupByDay } from '@/lib/days';
 import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
 import { useRemote } from '@/lib/remote';
 import { type Unit, formatNumber } from '@/lib/units';
@@ -102,7 +103,14 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
         que no toques lo sigue ajustando él con el feedback del atleta.
       </Text>
 
-      {grid.rows.map((row) => (
+      {groupByDay(grid.rows).map((group) => (
+        <View key={group.dayNumber} style={styles.dayGroup}>
+          {/* Con un solo día sin nombre el encabezado no dice nada. */}
+          {grid.daysPerWeek > 1 || grid.days.length > 0 ? (
+            <Text style={styles.dayHeading}>{dayHeading(group.dayNumber, grid.days)}</Text>
+          ) : null}
+
+          {group.items.map((row) => (
         <View key={row.mesocycleExerciseId} style={styles.card}>
           <Text style={styles.name}>{row.name}</Text>
           <Text style={styles.meta}>{row.equipment}</Text>
@@ -160,6 +168,8 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
               })}
             </View>
           </ScrollView>
+        </View>
+          ))}
         </View>
       ))}
 
@@ -428,6 +438,8 @@ function numberOrNull(text: string): number | null {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
+  dayGroup: { gap: space.sm, marginTop: space.sm },
+  dayHeading: { color: color.accent, fontSize: 10, letterSpacing: 2 },
   center: { alignItems: 'center', justifyContent: 'center', gap: space.sm, padding: space.xxl },
   emptyBody: { color: color.textMuted, fontSize: 12.5, textAlign: 'center' },
   link: { color: color.accent, fontSize: 13 },

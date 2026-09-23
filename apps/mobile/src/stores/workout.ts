@@ -24,8 +24,8 @@ import { create } from 'zustand';
 import type { Feedback } from '@cage/engine';
 
 import { ApiError } from '@/api/client';
-import { currentSession } from '@/api/endpoints';
-import type { SessionOut, SetLogIn } from '@/api/types';
+import { currentSession, openNextSession } from '@/api/endpoints';
+import type { NextUpOut, SessionOut, SetLogIn } from '@/api/types';
 import {
   cacheSession,
   newClientId,
@@ -49,6 +49,10 @@ interface LocalMark {
 
 interface WorkoutState {
   session: SessionOut | null;
+  /** Qué día toca abrir cuando no hay sesión abierta. Lo calcula el servidor. */
+  next: NextUpOut | null;
+  /** Tiene bloque y ya hizo todos sus días. */
+  finished: boolean;
   loading: boolean;
   error: string | null;
   /** true si lo que se ve salió de la caché y no del servidor. */
@@ -60,6 +64,8 @@ interface WorkoutState {
   feedbackDone: Record<string, boolean>;
 
   load: (athleteId?: string) => Promise<void>;
+  /** El atleta abre su día: el servidor decide cuál. */
+  openNext: () => Promise<void>;
   toggleSet: (
     sessionExerciseId: string,
     index: number,
@@ -80,6 +86,8 @@ const key = (sessionExerciseId: string, index: number) =>
 
 export const useWorkout = create<WorkoutState>((set, get) => ({
   session: null,
+  next: null,
+  finished: false,
   loading: false,
   error: null,
   stale: false,
@@ -89,15 +97,18 @@ export const useWorkout = create<WorkoutState>((set, get) => ({
   load: async (athleteId) => {
     set({ loading: true, error: null });
     try {
-      const session = await currentSession(athleteId);
+      const { session, next, finished } = await currentSession(athleteId);
       if (session !== null) await cacheSession(session.id, session);
-      set({ session, stale: false, marks: {}, feedbackDone: {} });
+      set({ session, next, finished, stale: false, marks: {}, feedbackDone: {} });
     } catch (error) {
       // Sin red se abre lo último que se vio. Perder el entrenamiento por no
       // tener cobertura sería el peor fallo posible de esta app.
       const cached = await readLastCachedSession<SessionOut>();
       set({
         session: cached,
+        // Sin red no se sabe qué toca: solo se puede retomar lo ya guardado.
+        next: null,
+        finished: false,
         stale: cached !== null,
         error:
           cached !== null
@@ -105,6 +116,26 @@ export const useWorkout = create<WorkoutState>((set, get) => ({
             : error instanceof ApiError && error.offline
               ? 'Sin conexión y nada guardado todavía.'
               : 'No se pudo cargar la sesión.',
+      });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  openNext: async () => {
+    set({ loading: true, error: null });
+    try {
+      const session = await openNextSession();
+      await cacheSession(session.id, session);
+      set({ session, next: null, stale: false, marks: {}, feedbackDone: {} });
+    } catch (error) {
+      set({
+        error:
+          error instanceof ApiError
+            ? error.offline
+              ? 'Sin conexión con el servidor.'
+              : error.message
+            : 'No se pudo abrir tu día.',
       });
     } finally {
       set({ loading: false });
