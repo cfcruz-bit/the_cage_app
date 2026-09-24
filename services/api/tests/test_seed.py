@@ -162,3 +162,57 @@ async def test_la_base_acepta_basicos_y_rechaza_un_grupo_inventado(
     )
     with pytest.raises(IntegrityError):
         await session.flush()
+
+
+# ── La segunda tanda: la libreta completa ────────────────────────────────────
+
+
+def test_los_grupos_nuevos_tienen_ejercicios() -> None:
+    """ADUCTORES, ANTEBRAZO y CARDIO no pueden quedarse vacios.
+
+    Un grupo vacio en el selector es peor que no tenerlo: el coach lo abre,
+    no hay nada y no sabe si es un fallo o es que no hay.
+    """
+    por_grupo = {s.muscle for s in CATALOG}
+    for grupo in ("ADUCTORES", "ANTEBRAZO", "CARDIO"):
+        assert grupo in por_grupo, f"{grupo} se quedo sin ejercicios"
+
+
+def test_el_cardio_no_lleva_rangos_de_fuerza() -> None:
+    """Los circuitos son densidad, no carga.
+
+    Si alguien anade un thruster a 3 repeticiones es que lo esta tratando como
+    un basico, y el conteo de volumen dejara de significar lo que dice.
+    """
+    cortos = [
+        f"{s.name} ({s.rep_lo}-{s.rep_hi})"
+        for s in CATALOG
+        if s.muscle == "CARDIO" and s.rep_hi < 10
+    ]
+    assert not cortos, f"cardio con rango de fuerza: {cortos}"
+
+
+def test_las_variantes_del_mismo_ejercicio_no_se_fusionaron() -> None:
+    """Bulgara con mancuernas y en Smith son DOS ejercicios.
+
+    Es una decision explicita del coach: cada una lleva su propio historial de
+    cargas, y en una Smith se mueve mucho mas peso. Fusionarlas haria que el
+    motor propusiera cargas imposibles al alternar entre ellas.
+    """
+    nombres = {s.name for s in CATALOG}
+    for familia in ("Bulgara", "Farmer carry", "Jalon al pecho"):
+        variantes = [n for n in nombres if n.startswith(familia)]
+        assert len(variantes) >= 2, f"{familia} deberia tener variantes: {variantes}"
+
+
+def test_ningun_ejercicio_repite_nombre_con_el_mismo_equipo() -> None:
+    """Ya lo cubre el test de claves, pero con 215 filas el mensaje importa.
+
+    Si dos filas comparten (nombre, equipo), el seed actualiza una y deja la
+    otra huerfana, y el coach ve el mismo ejercicio dos veces sin saber cual
+    es cual.
+    """
+    from collections import Counter
+
+    repetidos = [k for k, c in Counter((s.name, s.equipment) for s in CATALOG).items() if c > 1]
+    assert not repetidos, f"claves repetidas: {repetidos}"

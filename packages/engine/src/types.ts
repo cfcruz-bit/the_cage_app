@@ -27,6 +27,9 @@ export const MuscleGroup = {
   Glutes: 'GLUTES',
   Calves: 'CALVES',
   Abs: 'ABS',
+  Aductores: 'ADUCTORES',
+  Antebrazo: 'ANTEBRAZO',
+  Cardio: 'CARDIO',
 } as const;
 export type MuscleGroup = (typeof MuscleGroup)[keyof typeof MuscleGroup];
 

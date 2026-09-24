@@ -8,6 +8,11 @@
  * El orden no es alfabético: va de arriba abajo del cuerpo, que es como un
  * coach recorre un plan y como estaba ordenado el prototipo.
  *
+ * Dos de la lista no son músculos y van en los extremos a propósito.
+ * `BASICOS` abre, porque es por donde empieza cualquier sesión de fuerza.
+ * `CARDIO` cierra, porque los circuitos metabólicos van al final del día si
+ * es que van: el motor no los autorregula.
+ *
  * `BASICOS` va primero y no es un músculo: son los movimientos de competición
  * y sus variantes. Encabeza la lista porque es por donde empieza cualquier
  * sesión de fuerza — el básico del día va antes que el accesorio, siempre.
@@ -24,7 +29,10 @@ export const MUSCLE_ORDER = [
   'HAMSTRINGS',
   'GLUTES',
   'CALVES',
+  'ADUCTORES',
   'ABS',
+  'ANTEBRAZO',
+  'CARDIO',
 ] as const;
 
 export type MuscleKey = (typeof MUSCLE_ORDER)[number];
@@ -40,7 +48,10 @@ export const MUSCLE_LABEL: Record<string, string> = {
   HAMSTRINGS: 'Isquios',
   GLUTES: 'Glúteos',
   CALVES: 'Gemelos',
-  ABS: 'Abdomen',
+  ADUCTORES: 'Aductores',
+  ABS: 'Core',
+  ANTEBRAZO: 'Antebrazo',
+  CARDIO: 'Cardio',
 };
 
 /** Etiqueta legible. Devuelve la clave cruda si el servidor manda una nueva. */

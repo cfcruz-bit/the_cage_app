@@ -57,6 +57,15 @@ class MuscleGroup(StrEnum):
     GLUTES = "GLUTES"
     CALVES = "CALVES"
     ABS = "ABS"
+    ADUCTORES = "ADUCTORES"
+    ANTEBRAZO = "ANTEBRAZO"
+
+    #: Tampoco es un musculo, igual que BASICOS. Son los circuitos
+    #: metabolicos: burpees, box jumps, thrusters. Van aparte porque el motor
+    #: NO los autorregula —no progresan por carga sino por tiempo y densidad—
+    #: y mezclarlos con el trabajo de fuerza haria que el conteo de volumen
+    #: semanal contara series que no son series.
+    CARDIO = "CARDIO"
 
 
 class Aggressiveness(StrEnum):
