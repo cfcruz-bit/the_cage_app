@@ -15,7 +15,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { ApiError } from '@/api/client';
 import { linkAthlete } from '@/api/endpoints';
 import { useApp } from '@/stores/app';
@@ -153,14 +155,68 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.about}>
-          <Text style={styles.aboutLine}>The Cage 2.0 · Fase 1</Text>
-          <Text style={styles.aboutLine}>Política del motor {POLICY_VERSION}</Text>
-          <Text style={styles.aboutLine}>
-            Sin conexión: todo se guarda en este teléfono. La sincronización llega en la Fase 3.
-          </Text>
+          {lineasDeVersion().map((linea) => (
+            <Text key={linea} style={styles.aboutLine}>
+              {linea}
+            </Text>
+          ))}
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+/**
+ * Qué versión está corriendo este teléfono.
+ *
+ * Sustituye al texto de "Fase 1 / la sincronización llega en la Fase 3" que
+ * vivía aquí. Ese texto describía el estado del PROYECTO, y el proyecto avanzó
+ * sin que nadie se acordara de actualizarlo: acabó afirmando que los datos no
+ * salían del teléfono cuando llevaban días sincronizándose. Un texto fijo sobre
+ * el estado del desarrollo siempre termina mintiendo con la autoridad de venir
+ * de la propia app.
+ *
+ * Lo que sale ahora se calcula, así que no puede quedarse viejo, y es lo que
+ * de verdad hace falta cuando un atleta escribe diciendo que algo no le
+ * funciona: qué versión tiene y si recogió la última actualización. Sin esto
+ * hay que adivinarlo preguntando.
+ */
+function lineasDeVersion(): string[] {
+  const version = Constants.expoConfig?.version ?? '?';
+  const lineas = [
+    `The Cage 2.0 · v${version}`,
+    `Política del motor ${POLICY_VERSION}`,
+  ];
+
+  if (!Updates.isEnabled) {
+    // Expo Go y las builds de desarrollo no reciben actualizaciones por aire.
+    lineas.push('Actualizaciones por aire: desactivadas (desarrollo)');
+    return lineas;
+  }
+
+  const canal = Updates.channel ?? 'sin canal';
+
+  if (Updates.isEmbeddedLaunch) {
+    lineas.push(`Versión de fábrica del APK · canal ${canal}`);
+  } else {
+    lineas.push(`Actualizada ${fechaCorta(Updates.createdAt)} · canal ${canal}`);
+  }
+
+  // Los ocho primeros caracteres bastan para identificar la actualización en
+  // el panel de Expo, y caben en una línea.
+  const id = Updates.updateId;
+  if (id !== null) lineas.push(`Actualización ${id.slice(0, 8)}`);
+
+  return lineas;
+}
+
+/** dd/mm/aaaa hh:mm, sin depender del soporte de Intl del teléfono. */
+function fechaCorta(fecha: Date | null): string {
+  if (fecha === null) return 'en fecha desconocida';
+  const dd = (n: number) => String(n).padStart(2, '0');
+  return (
+    `el ${dd(fecha.getDate())}/${dd(fecha.getMonth() + 1)}/${fecha.getFullYear()}` +
+    ` a las ${dd(fecha.getHours())}:${dd(fecha.getMinutes())}`
   );
 }
 
