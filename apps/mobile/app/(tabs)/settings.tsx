@@ -57,6 +57,22 @@ export default function SettingsScreen() {
   const user = useAuth((s) => s.user);
 
   /**
+   * Toques seguidos sobre la linea de version. A los cinco aparece el bloque
+   * de desarrollo.
+   *
+   * Por que un gesto y no el rol: `clearSession` borra los sets y el feedback
+   * DE ESTE TELEFONO, y esos sets ya viajaron al servidor. Un atleta que lo
+   * pulse deja su movil y la base del coach contando cosas distintas. Pero
+   * esconderlo por rol tampoco sirve, porque la forma normal de probar la app
+   * es entrar como atleta: se esconderia justo cuando hace falta.
+   *
+   * Un gesto lo resuelve por los dos lados. Nadie lo encuentra sin que se lo
+   * digan, y quien lo necesita lo tiene en cualquier rol y en cualquier build.
+   */
+  const [toquesEnVersion, setToquesEnVersion] = useState(0);
+  const modoDesarrollo = __DEV__ || toquesEnVersion >= 5;
+
+  /**
    * Cierra la sesión de verdad: revoca el refresh token en el servidor y borra
    * las credenciales del teléfono.
    *
@@ -143,23 +159,40 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.group}>
-          <Text style={styles.groupTitle}>Desarrollo</Text>
-          <Pressable
-            onPress={confirmClear}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.danger, pressed && styles.pressed]}
-          >
-            <Text style={styles.dangerText}>Borrar la sesión de hoy</Text>
-          </Pressable>
-        </View>
+        {modoDesarrollo ? (
+          <View style={styles.group}>
+            <Text style={styles.groupTitle}>Desarrollo</Text>
+            <Text style={styles.groupHelp}>
+              Borra los sets de este teléfono, no los del servidor. Si ya se
+              sincronizaron, volverán a bajar.
+            </Text>
+            <Pressable
+              onPress={confirmClear}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.danger, pressed && styles.pressed]}
+            >
+              <Text style={styles.dangerText}>Borrar la sesión de hoy</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.about}>
-          {lineasDeVersion().map((linea) => (
-            <Text key={linea} style={styles.aboutLine}>
-              {linea}
-            </Text>
-          ))}
+          {lineasDeVersion().map((linea, i) =>
+            i === 0 ? (
+              <Text
+                key={linea}
+                style={styles.aboutLine}
+                onPress={() => setToquesEnVersion((n) => n + 1)}
+                suppressHighlighting
+              >
+                {linea}
+              </Text>
+            ) : (
+              <Text key={linea} style={styles.aboutLine}>
+                {linea}
+              </Text>
+            ),
+          )}
         </View>
       </ScrollView>
     </Screen>
