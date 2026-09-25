@@ -7,9 +7,47 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { color, palette, radius, space } from '@/theme/tokens';
 import { formatRest } from '@/lib/prescription';
+
+// El setInterval muere con la app en segundo plano; la alarma la agenda el
+// sistema para que suene aunque el atleta esté en otra aplicación.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+const CHANNEL = 'rest';
+const ready = (async () => {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync(CHANNEL, {
+      name: 'Descanso entre series',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 400, 200, 400],
+    });
+  }
+  const { granted } = await Notifications.requestPermissionsAsync();
+  return granted;
+})().catch(() => false);
+
+async function scheduleAlarm(seconds: number) {
+  if (seconds <= 0 || !(await ready)) return null;
+  return Notifications.scheduleNotificationAsync({
+    content: { title: 'Descanso completo', body: 'A la siguiente serie.', sound: 'default' },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds,
+      channelId: CHANNEL,
+    },
+  });
+}
 
 interface Props {
   /** Duración pautada, en segundos. */
@@ -44,7 +82,16 @@ export function RestTimer({ seconds, runKey, onDismiss }: Props) {
       if (remaining <= 0) clearInterval(id);
     }, 250);
 
-    return () => clearInterval(id);
+    // Saltar, marcar otro set o salir de la pantalla desmonta el efecto y
+    // cancela la alarma pendiente.
+    const alarm = scheduleAlarm(seconds);
+
+    return () => {
+      clearInterval(id);
+      alarm
+        .then((n) => (n ? Notifications.cancelScheduledNotificationAsync(n) : undefined))
+        .catch(() => {});
+    };
   }, [runKey, seconds, progress]);
 
   if (runKey == null) return null;
