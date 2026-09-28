@@ -51,6 +51,7 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import (
+    apply_prescription,
     last_performance,
     rest_seconds_for,
     sets_for,
@@ -345,8 +346,14 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
         # Si esta fila tiene un peso congelado, tuvo que haber un ultimo peso
         # cuando se genero, y el historico solo crece: sigue habiendolo.
         assert last is not None, "una fila con peso congelado no puede quedarse sin historico"
-        exercise = to_domain_exercise(
-            mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
+        # Con el rango y el RIR de ESTA semana: sin esto las series salian con
+        # las reps base del ejercicio aunque el coach pautara otras.
+        exercise = apply_prescription(
+            to_domain_exercise(
+                mex, last, mex.catalog.name, mex.catalog.muscle, mex.catalog.equipment
+            ),
+            mex,
+            ts.week_number,
         )
         # El plan sale de la fila, NO se vuelve a pedir al motor.
         plan = _frozen_plan(se, exercise)

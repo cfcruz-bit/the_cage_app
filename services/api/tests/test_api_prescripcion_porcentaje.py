@@ -224,3 +224,26 @@ async def test_porcentaje_fuera_de_30_110_es_422(
 ) -> None:
     r = await _pautar(client, bloque, {"loadPercent": pct, "restSeconds": 150})
     assert r.status_code == 422, r.text
+
+
+# ── Reps de la semana ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_las_reps_pautadas_para_la_semana_llegan_a_cada_serie(
+    client: AsyncClient, bloque: dict
+) -> None:
+    """Pautar la semana 3 a 2 reps tiene que verse en el entreno, no solo en la
+    tabla. Antes las series salian con el rango base del ejercicio (1-5)."""
+    r = await _pautar(
+        client,
+        bloque,
+        {"weekNumber": 3, "loadKg": 100.0, "sets": 4, "repLo": 2, "repHi": 2},
+    )
+    assert r.status_code == 200, r.text
+
+    r = await _sesion(client, bloque, semana=3)
+    assert r.status_code == 201, r.text
+    series = r.json()["exercises"][0]["sets"]
+    assert len(series) == 4
+    assert {s["targetReps"] for s in series} == {2}
