@@ -87,6 +87,11 @@ class SessionExercise(Base, TimestampMixin):
         CheckConstraint(
             "planned_load_kg IS NULL OR planned_load_kg > 0", name="carga_planificada"
         ),
+        CheckConstraint(
+            "(backoff_sets IS NULL AND backoff_reps IS NULL AND backoff_load_kg IS NULL) OR "
+            "(backoff_sets >= 1 AND backoff_reps >= 1 AND backoff_load_kg > 0)",
+            name="backoff_congelado",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
@@ -102,7 +107,14 @@ class SessionExercise(Base, TimestampMixin):
     #: de `MesocycleExercise.starting_load_kg`). El atleta escribe el suyo en
     #: la propia sesion; ese registro es lo que alimenta la PROXIMA.
     planned_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    #: Con back-off, son solo los top sets: las series 0..planned_sets-1.
     planned_sets: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    #: Back-offs congelados, ya en kilos: las series planned_sets.. en
+    #: adelante. NULL = el ejercicio no lleva back-off esta semana.
+    backoff_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    backoff_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    backoff_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     #: Version de las reglas con las que se calculo. Sin esto el historico no
     #: se puede interpretar cuando la politica cambie.

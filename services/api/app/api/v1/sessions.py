@@ -335,11 +335,14 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                     muscle=mex.catalog.muscle,
                     planned_load_kg=None,
                     planned_sets=se.planned_sets,
+                    backoff_sets=se.backoff_sets,
+                    backoff_reps=se.backoff_reps,
+                    backoff_load_kg=se.backoff_load_kg,
                     rest_seconds=rest_seconds_for(mex, ts.week_number),
                     policy_version=se.policy_version,
                     why=se.why,
                     exercise=None,
-                    sets=_blank_sets(se),
+                    sets=_blank_sets(se) + _backoff_out(se),
                 )
             )
             continue
@@ -365,7 +368,7 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
         )
         # El plan sale de la fila, NO se vuelve a pedir al motor.
         plan = _frozen_plan(se, exercise)
-        planned = sets_for(exercise, plan, list(se.set_logs))
+        planned = sets_for(exercise, plan, _top_logs(se))
 
         out.append(
             SessionExerciseOut(
@@ -375,6 +378,9 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                 muscle=mex.catalog.muscle,
                 planned_load_kg=se.planned_load_kg,
                 planned_sets=se.planned_sets,
+                backoff_sets=se.backoff_sets,
+                backoff_reps=se.backoff_reps,
+                backoff_load_kg=se.backoff_load_kg,
                 rest_seconds=rest_seconds_for(mex, ts.week_number),
                 policy_version=se.policy_version,
                 why=se.why,
@@ -391,7 +397,8 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                         done=s.done,
                     )
                     for s in planned
-                ],
+                ]
+                + _backoff_out(se),
             )
         )
 
@@ -408,9 +415,47 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
     )
 
 
+def _top_logs(se: SessionExercise) -> list[SetLog]:
+    """Lo registrado en los top sets. Sin back-off, todo lo registrado."""
+    if se.backoff_sets is None:
+        return list(se.set_logs)
+    return [log for log in se.set_logs if log.idx < se.planned_sets]
+
+
+def _backoff_out(se: SessionExercise) -> list[PlannedSetOut]:
+    """Los back-offs, detras de los top sets y con su carga fija congelada.
+
+    No pasan por el motor: el coach los pauto a una carga concreta y el dueno
+    decidio que no dependan de lo que salga el top.
+    """
+    if se.backoff_sets is None:
+        return []
+    by_index = {log.idx: log for log in se.set_logs}
+    start = se.planned_sets
+    end = max([start + se.backoff_sets] + [i + 1 for i in by_index if i >= start])
+
+    out: list[PlannedSetOut] = []
+    for i in range(start, end):
+        log = by_index.get(i)
+        out.append(
+            PlannedSetOut(
+                index=i,
+                target_weight_kg=se.backoff_load_kg,
+                target_reps=se.backoff_reps,
+                why="back-off pautado por tu coach",
+                logged_weight_kg=log.weight_kg if log is not None else None,
+                logged_reps=log.reps if log is not None else None,
+                logged_rpe=log.rpe if log is not None else None,
+                done=bool(log.done) if log is not None else False,
+                backoff=True,
+            )
+        )
+    return out
+
+
 def _blank_sets(se: SessionExercise) -> list[PlannedSetOut]:
     """Las series de un ejercicio sin ningun peso, con lo ya registrado."""
-    by_index = {log.idx: log for log in se.set_logs}
+    by_index = {log.idx: log for log in _top_logs(se)}
     size = max(max(by_index) + 1, se.planned_sets) if by_index else se.planned_sets
 
     out: list[PlannedSetOut] = []

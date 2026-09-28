@@ -256,6 +256,36 @@ async def test_el_rango_de_reps_va_entero_o_vacio(session: AsyncSession) -> None
 
 
 @pytest.mark.asyncio
+async def test_el_back_off_va_entero_o_no_va(session: AsyncSession) -> None:
+    """Sets sin carga no es una serie que se pueda pintar."""
+    _, mex = await _meso_con_ejercicio(session)
+    session.add(
+        Prescription(
+            mesocycle_exercise_id=mex.id, backoff_sets=3, backoff_reps=5, rest_seconds=150
+        )
+    )
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_el_back_off_es_kilos_o_porcentaje_no_los_dos(session: AsyncSession) -> None:
+    _, mex = await _meso_con_ejercicio(session)
+    session.add(
+        Prescription(
+            mesocycle_exercise_id=mex.id,
+            backoff_sets=3,
+            backoff_reps=5,
+            backoff_load_kg=100.0,
+            backoff_load_percent=75.0,
+            rest_seconds=150,
+        )
+    )
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
 async def test_una_prescripcion_por_ejercicio_y_semana(
     session: AsyncSession,
 ) -> None:

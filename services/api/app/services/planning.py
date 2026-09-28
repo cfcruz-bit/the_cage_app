@@ -100,7 +100,9 @@ async def last_performance(
             feedback=NEUTRAL_FEEDBACK,
         )
 
-    done = [log for log in se.set_logs if log.done]
+    # Solo los top sets: los back-offs van a otra carga y contarian como
+    # volumen extra que el motor no pauto.
+    done = [log for log in se.set_logs if log.done and log.idx < se.planned_sets]
     fb = se.feedback
 
     # Se toma el PRIMER set completado como referencia de carga y reps: es el
@@ -199,6 +201,9 @@ def effective_prescription(
     week_sets_load = week.load_kg is not None or week.load_percent is not None
     load_kg = week.load_kg if week_sets_load else base.load_kg
     load_percent = week.load_percent if week_sets_load else base.load_percent
+    # El back-off tambien va en bloque: mezclar los sets de uno con la carga
+    # de otro daria una serie que nadie pauto.
+    backoff = week if week.backoff_sets is not None else base
 
     return Prescription(
         mesocycle_exercise_id=mex.id,
@@ -210,6 +215,10 @@ def effective_prescription(
         rep_hi=week.rep_hi if week.rep_hi is not None else base.rep_hi,
         target_rir=(week.target_rir if week.target_rir is not None else base.target_rir),
         rest_seconds=week.rest_seconds,
+        backoff_sets=backoff.backoff_sets,
+        backoff_reps=backoff.backoff_reps,
+        backoff_load_kg=backoff.backoff_load_kg,
+        backoff_load_percent=backoff.backoff_load_percent,
     )
 
 
@@ -325,6 +334,25 @@ def resolve_without_history(
         assert one_rm_kg is not None, "el llamador debe validar la marca antes de resolver"
         return load_from_percent(one_rm_kg, p.load_percent, mex.load_increment_kg), sets
     return None, sets
+
+
+def resolve_backoff(
+    p: Prescription | None, one_rm_kg: float | None, increment_kg: float
+) -> tuple[int, int, float | None] | None:
+    """(sets, reps, kilos) del back-off, o None si la semana no lleva.
+
+    Los kilos salen None si esta pautado por % y no hay marca: igual que el
+    top, la tabla lo marca y generar la sesion se niega.
+    """
+    if p is None or p.backoff_sets is None or p.backoff_reps is None:
+        return None
+    if p.backoff_load_kg is not None:
+        load_kg: float | None = p.backoff_load_kg
+    elif p.backoff_load_percent is not None and one_rm_kg is not None:
+        load_kg = load_from_percent(one_rm_kg, p.backoff_load_percent, increment_kg)
+    else:
+        load_kg = None
+    return p.backoff_sets, p.backoff_reps, load_kg
 
 
 def rest_seconds_for(mex: MesocycleExercise, week_number: int | None = None) -> int:
@@ -450,8 +478,14 @@ def project_grid(
                 needs_one_rm = True
                 load_kg = None
 
+        backoff = resolve_backoff(p, one_rm_kg, increment)
         rows.append(
             {
+                "backoff_sets": backoff[0] if backoff else None,
+                "backoff_reps": backoff[1] if backoff else None,
+                "backoff_load_kg": backoff[2] if backoff else None,
+                "backoff_load_percent": p.backoff_load_percent if backoff else None,
+                "backoff_needs_one_rm": backoff is not None and backoff[2] is None,
                 "week_number": week,
                 "is_deload": is_deload,
                 "sets": sets,

@@ -125,7 +125,34 @@ class ExerciseCatalogOut(ExerciseCatalogIn):
 # ── Mesociclos ───────────────────────────────────────────────────────────────
 
 
-class WeekLoadIn(ApiModel):
+class BackoffIn(ApiModel):
+    """Back-offs detras del top set. Solo basicos: lo exige la API, no esto.
+
+    Carga fija, en kilos O en % del 1RM, independiente de lo que salga el top.
+    Todo null = sin back-off.
+    """
+
+    backoff_sets: int | None = Field(default=None, ge=1, le=20)
+    backoff_reps: int | None = Field(default=None, ge=1, le=100)
+    backoff_load_kg: float | None = Field(default=None, gt=0, le=1000)
+    backoff_load_percent: float | None = Field(default=None, ge=30, le=110)
+
+    @property
+    def has_backoff(self) -> bool:
+        return self.backoff_sets is not None
+
+    @model_validator(mode="after")
+    def _backoff_entero(self) -> BackoffIn:
+        cargas = (self.backoff_load_kg is not None) + (self.backoff_load_percent is not None)
+        if cargas == 2:
+            raise ValueError("Fija el back-off en kilos o en porcentaje del 1RM, no los dos")
+        campos = (self.backoff_sets is not None, self.backoff_reps is not None, cargas == 1)
+        if any(campos) and not all(campos):
+            raise ValueError("El back-off lleva sets, reps y carga, o nada")
+        return self
+
+
+class WeekLoadIn(BackoffIn):
     """Una fila del paso 4 opcional: la carga de UNA semana de UN ejercicio.
 
     Se guarda como una `Prescription` de esa semana. Es la misma regla de
@@ -212,7 +239,7 @@ class MesocycleDaysIn(ApiModel):
     exercises: list[DayExerciseIn] = Field(default_factory=list, max_length=40)
 
 
-class PrescriptionIn(ApiModel):
+class PrescriptionIn(BackoffIn):
     """Lo que el coach fija a mano. null = lo decide el motor."""
 
     #: None = para todo el bloque. N = solo para la semana N.
@@ -242,6 +269,7 @@ class PrescriptionOut(PrescriptionIn):
     #: True cuando hay `load_percent` pero el atleta no tiene marca de ese
     #: ejercicio: la celda no se puede resolver a kilos todavia.
     needs_one_rm: bool = False
+    backoff_needs_one_rm: bool = False
 
 
 class MesocycleExerciseOut(ApiModel):
@@ -318,6 +346,8 @@ class PlannedSetOut(ApiModel):
     logged_reps: str | None
     logged_rpe: str | None
     done: bool
+    #: True en las series que vienen detras del top set.
+    backoff: bool = False
 
 
 class SessionExerciseOut(ApiModel):
@@ -329,6 +359,10 @@ class SessionExerciseOut(ApiModel):
     #: todavia un peso real. El atleta lo escribe el mismo en la sesion.
     planned_load_kg: float | None
     planned_sets: int
+    #: Back-offs congelados, en kilos. null = sin back-off.
+    backoff_sets: int | None = None
+    backoff_reps: int | None = None
+    backoff_load_kg: float | None = None
     rest_seconds: int
     policy_version: str
     why: str
@@ -583,6 +617,13 @@ class PlanCellOut(ApiModel):
     rep_hi: int
     target_rir: int
     rest_seconds: int
+
+    #: Back-off pautado para la semana. null = sin back-off.
+    backoff_sets: int | None = None
+    backoff_reps: int | None = None
+    backoff_load_kg: float | None = None
+    backoff_load_percent: float | None = None
+    backoff_needs_one_rm: bool = False
 
     sets_overridden: bool
     load_overridden: bool

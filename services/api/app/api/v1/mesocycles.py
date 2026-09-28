@@ -113,6 +113,13 @@ def _validate_layout(
         raise _422(f"El dia {', '.join(str(d) for d in vacios)} se queda sin ejercicios")
 
 
+def _solo_basicos(name: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail=f"{name} no es un basico: el top set con back-off es solo para basicos",
+    )
+
+
 def _to_prescription_out(
     mex_id: uuid.UUID, p: Prescription | None, mark: Mark | None
 ) -> PrescriptionOut | None:
@@ -130,6 +137,11 @@ def _to_prescription_out(
         rest_seconds=p.rest_seconds,
         one_rm_kg=mark.value_kg if mark is not None else None,
         needs_one_rm=p.load_percent is not None and mark is None,
+        backoff_sets=p.backoff_sets,
+        backoff_reps=p.backoff_reps,
+        backoff_load_kg=p.backoff_load_kg,
+        backoff_load_percent=p.backoff_load_percent,
+        backoff_needs_one_rm=p.backoff_load_percent is not None and mark is None,
     )
 
 
@@ -239,6 +251,8 @@ async def create_mesocycle(
             )
 
         muscle, name = catalog[item.catalog_id]
+        if muscle != MuscleGroup.BASICOS.value and any(w.has_backoff for w in item.weeks):
+            raise _solo_basicos(name)
         if muscle == MuscleGroup.BASICOS.value:
             con_carga = {
                 w.week_number
@@ -282,6 +296,10 @@ async def create_mesocycle(
                     rep_lo=week.rep_lo,
                     rep_hi=week.rep_hi,
                     target_rir=week.target_rir,
+                    backoff_sets=week.backoff_sets,
+                    backoff_reps=week.backoff_reps,
+                    backoff_load_kg=week.backoff_load_kg,
+                    backoff_load_percent=week.backoff_load_percent,
                     set_by_id=coach.id,
                 )
             )
@@ -534,7 +552,10 @@ async def set_prescription(
             MesocycleExercise.id == exercise_id,
             MesocycleExercise.mesocycle_id == meso.id,
         )
-        .options(selectinload(MesocycleExercise.prescriptions))
+        .options(
+            selectinload(MesocycleExercise.prescriptions),
+            selectinload(MesocycleExercise.catalog),
+        )
     )
     mex = found.scalar_one_or_none()
     if mex is None:
@@ -542,6 +563,8 @@ async def set_prescription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ese ejercicio no esta en este mesociclo",
         )
+    if body.has_backoff and mex.catalog.muscle != MuscleGroup.BASICOS.value:
+        raise _solo_basicos(mex.catalog.name)
 
     if body.week_number is not None and body.week_number > meso.total_weeks:
         raise HTTPException(
@@ -562,6 +585,10 @@ async def set_prescription(
     p.rep_hi = body.rep_hi
     p.target_rir = body.target_rir
     p.rest_seconds = body.rest_seconds
+    p.backoff_sets = body.backoff_sets
+    p.backoff_reps = body.backoff_reps
+    p.backoff_load_kg = body.backoff_load_kg
+    p.backoff_load_percent = body.backoff_load_percent
     p.set_by_id = coach.id
     session.add(p)
 

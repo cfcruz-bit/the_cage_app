@@ -37,6 +37,7 @@ from app.services.planning import (
     FIRST_SESSION_WHY,
     effective_prescription,
     last_performance,
+    resolve_backoff,
     resolve_plan,
     resolve_without_history,
     to_domain_exercise,
@@ -184,18 +185,28 @@ async def generate_session(
     # tambien la fila de `ts` de arriba.
     for mex in mexs:
         p = effective_prescription(mex, week_number)
-        if p is not None and p.load_percent is not None and mex.catalog_id not in marks:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"Falta la marca de {mex.catalog.name} para calcular el {p.load_percent:g}%"
-                ),
-            )
+        if p is None or mex.catalog_id in marks:
+            continue
+        for pct in (p.load_percent, p.backoff_load_percent):
+            if pct is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Falta la marca de {mex.catalog.name} para calcular el {pct:g}%",
+                )
 
     for mex in mexs:
         last = await last_performance(session, mex)
         mark = marks.get(mex.catalog_id)
         one_rm_kg = mark.value_kg if mark is not None else None
+        # Ya validado arriba: si lleva back-off, sus kilos estan resueltos.
+        backoff = resolve_backoff(
+            effective_prescription(mex, week_number), one_rm_kg, mex.load_increment_kg
+        )
+        frozen_backoff = {
+            "backoff_sets": backoff[0] if backoff else None,
+            "backoff_reps": backoff[1] if backoff else None,
+            "backoff_load_kg": backoff[2] if backoff else None,
+        }
 
         if last is None:
             # Sin ningun peso previo el motor no tiene de donde partir. Si el
@@ -211,6 +222,7 @@ async def generate_session(
                     planned_sets=sets,
                     policy_version=POLICY_VERSION,
                     why=FIRST_SESSION_WHY if load_kg is None else "carga pautada por tu coach",
+                    **frozen_backoff,
                 )
             )
             continue
@@ -231,6 +243,7 @@ async def generate_session(
                 planned_sets=plan.sets,
                 policy_version=plan.policy_version,
                 why=plan.why,
+                **frozen_backoff,
             )
         )
 

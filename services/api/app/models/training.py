@@ -366,6 +366,22 @@ class Prescription(Base, TimestampMixin):
         # Una fila fija kilos o fija un porcentaje del 1RM, nunca los dos: si
         # los dos convivieran no habria forma de saber cual gana al resolver.
         CheckConstraint("load_kg IS NULL OR load_percent IS NULL", name="carga_o_porcentaje"),
+        # Back-off: va entero (sets, reps y una carga) o no va.
+        CheckConstraint(
+            "(backoff_sets IS NULL AND backoff_reps IS NULL"
+            " AND backoff_load_kg IS NULL AND backoff_load_percent IS NULL) OR "
+            "(backoff_sets >= 1 AND backoff_reps >= 1"
+            " AND (backoff_load_kg IS NULL) <> (backoff_load_percent IS NULL))",
+            name="backoff_completo",
+        ),
+        CheckConstraint(
+            "backoff_load_kg IS NULL OR backoff_load_kg > 0", name="backoff_carga_positiva"
+        ),
+        CheckConstraint(
+            "backoff_load_percent IS NULL OR "
+            "(backoff_load_percent >= 30 AND backoff_load_percent <= 110)",
+            name="backoff_pct_razonable",
+        ),
         # Indice parcial: impide DOS prescripciones base para el mismo
         # ejercicio. El UNIQUE de arriba no lo cubre, porque tanto SQLite como
         # Postgres consideran que dos NULL son distintos.
@@ -406,6 +422,15 @@ class Prescription(Base, TimestampMixin):
     rest_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=DEFAULT_REST_SECONDS
     )
+
+    #: Back-offs detras del top set (solo basicos). Con back-off, `sets`,
+    #: `rep_*` y la carga de arriba describen el TOP set; estos, las series
+    #: que vienen despues. Carga fija (kg o % del 1RM), no relativa al top:
+    #: decision del dueno. Todo NULL = sin back-off.
+    backoff_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    backoff_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    backoff_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    backoff_load_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     #: Que coach la firmo. Para el historial de "quien cambio esto".
     set_by_id: Mapped[uuid.UUID | None] = mapped_column(
