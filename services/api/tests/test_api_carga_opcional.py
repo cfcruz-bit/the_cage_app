@@ -237,3 +237,50 @@ async def test_completar_sin_registrar_peso_deja_la_siguiente_en_blanco(
     s2 = (await _sesion(client, mundo, meso["id"], semana=2)).json()
     assert s2["exercises"][0]["plannedLoadKg"] is None
     assert "Primera sesión" in s2["exercises"][0]["why"]
+
+
+@pytest.mark.asyncio
+async def test_primera_sesion_de_basico_sin_arranque_usa_la_carga_de_la_semana(
+    client: AsyncClient, mundo: dict
+) -> None:
+    """Asi crea la app todos los basicos: sin `startingLoadKg`, con la carga en
+    cada semana. La sesion congelaba esa carga y luego `_render` exigia un
+    historico que todavia no existe: la primera sesion respondia 500."""
+    cat = await client.post(
+        "/api/v1/exercises",
+        headers=mundo["ca"],
+        json={
+            "name": "Banca competicion",
+            "muscle": "BASICOS",
+            "equipment": "Barra",
+            "repLo": 3,
+            "repHi": 6,
+            "targetRir": 3,
+            "loadIncrementKg": 2.5,
+        },
+    )
+    meso = await _crear_meso(
+        client,
+        mundo,
+        [
+            {
+                "catalogId": cat.json()["id"],
+                "repLo": 3,
+                "repHi": 6,
+                "targetRir": 3,
+                "loadIncrementKg": 2.5,
+                "startingLoadKg": None,
+                "startingReps": 4,
+                "startingSets": 4,
+                "weeks": [{"weekNumber": w, "loadKg": 100.0} for w in range(1, 7)],
+            }
+        ],
+    )
+    assert meso.status_code == 201, meso.text
+
+    r = await _sesion(client, mundo, meso.json()["id"])
+    assert r.status_code == 201, r.text
+    ex = r.json()["exercises"][0]
+    assert ex["plannedLoadKg"] == 100.0
+    assert len(ex["sets"]) == 4
+    assert ex["sets"][0]["targetWeightKg"] == 100.0

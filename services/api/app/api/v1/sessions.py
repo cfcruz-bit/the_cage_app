@@ -41,6 +41,7 @@ from app.api.dto import (
     SetLogBatch,
     SyncResult,
 )
+from app.domain.schemas import LastPerformance
 from app.models import (
     ExerciseFeedback,
     Mesocycle,
@@ -51,6 +52,7 @@ from app.models import (
     UserRole,
 )
 from app.services.planning import (
+    NEUTRAL_FEEDBACK,
     apply_prescription,
     last_performance,
     rest_seconds_for,
@@ -342,10 +344,16 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
             )
             continue
 
-        last = await last_performance(session, mex)
-        # Si esta fila tiene un peso congelado, tuvo que haber un ultimo peso
-        # cuando se genero, y el historico solo crece: sigue habiendolo.
-        assert last is not None, "una fila con peso congelado no puede quedarse sin historico"
+        # Sin historico, el peso congelado es la carga que el coach pauto para
+        # esta semana (un basico sin arranque, que es como los crea la app):
+        # se parte de ella, igual que de un `starting_load_kg`.
+        last = await last_performance(session, mex) or LastPerformance(
+            weight_kg=se.planned_load_kg,
+            reps=mex.starting_reps,
+            rir=mex.target_rir,
+            sets=se.planned_sets,
+            feedback=NEUTRAL_FEEDBACK,
+        )
         # Con el rango y el RIR de ESTA semana: sin esto las series salian con
         # las reps base del ejercicio aunque el coach pautara otras.
         exercise = apply_prescription(
