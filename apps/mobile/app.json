@@ -2,7 +2,7 @@
   "expo": {
     "name": "The Cage",
     "slug": "the-cage",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "scheme": "thecage",
     "userInterfaceStyle": "dark",
@@ -22,7 +22,7 @@
       "expo-router",
       "expo-sqlite",
       "expo-secure-store",
-      "expo-notifications"
+      ["expo-notifications", { "sounds": ["./assets/sounds/descanso.wav"] }]
     ],
     "experiments": {
       "typedRoutes": true

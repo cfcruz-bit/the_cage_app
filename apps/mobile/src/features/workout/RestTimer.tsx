@@ -23,14 +23,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const CHANNEL = 'rest';
+// Tono propio (assets/sounds, declarado en el plugin de app.json): el sonido
+// por defecto es un pitido corto que no se oye con la música del gimnasio.
+const SOUND = 'descanso.wav';
+// Android fija el sonido de un canal al crearlo y no deja cambiarlo: tono
+// nuevo = canal nuevo. El viejo ('rest') se borra para que no quede en Ajustes.
+const CHANNEL = 'rest-alarm';
 const ready = (async () => {
   if (Platform.OS === 'android') {
+    await Notifications.deleteNotificationChannelAsync('rest').catch(() => {});
     await Notifications.setNotificationChannelAsync(CHANNEL, {
       name: 'Descanso entre series',
       importance: Notifications.AndroidImportance.MAX,
-      sound: 'default',
-      vibrationPattern: [0, 400, 200, 400],
+      sound: SOUND,
+      vibrationPattern: [0, 400, 200, 400, 200, 400],
     });
   }
   const { granted } = await Notifications.requestPermissionsAsync();
@@ -40,7 +46,7 @@ const ready = (async () => {
 async function scheduleAlarm(seconds: number) {
   if (seconds <= 0 || !(await ready)) return null;
   return Notifications.scheduleNotificationAsync({
-    content: { title: 'Descanso completo', body: 'A la siguiente serie.', sound: 'default' },
+    content: { title: 'Descanso completo', body: 'A la siguiente serie.', sound: SOUND },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds,
