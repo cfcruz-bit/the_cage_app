@@ -32,7 +32,7 @@ import { ApiError } from '@/api/client';
 import { planGrid, setPrescription } from '@/api/endpoints';
 import type { PlanCellOut, PlanGridOut, PlanRowOut } from '@/api/types';
 import { dayHeading, groupByDay } from '@/lib/days';
-import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
+import { NO_BACKOFF, type ParsedLoad, parseBackoff, parseLoadInput } from '@/lib/loadInput';
 import { useRemote } from '@/lib/remote';
 import { type Unit, formatNumber } from '@/lib/units';
 import { useSession } from '@/stores/session';
@@ -47,6 +47,17 @@ function loadText(cell: PlanCellOut, unit: Unit): string {
   }
   if (cell.loadKg !== null) return formatNumber(cell.loadKg, unit);
   return '—';
+}
+
+/** "3×5 · 75% · 105 kg", o null si la semana no lleva back-off. */
+function backoffText(cell: PlanCellOut, unit: Unit): string | null {
+  if (cell.backoffSets == null) return null;
+  const kg = cell.backoffLoadKg === null ? null : `${formatNumber(cell.backoffLoadKg, unit)} kg`;
+  const load =
+    cell.backoffLoadPercent === null
+      ? kg
+      : `${trimPct(cell.backoffLoadPercent)}% · ${kg ?? 'sin marca'}`;
+  return `${cell.backoffSets}×${cell.backoffReps} · ${load}`;
 }
 
 function trimPct(v: number): string {
@@ -131,6 +142,7 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
                 // Un básico exige carga en cada semana; si falta, es un hueco
                 // que hay que llenar, no un "automático" normal.
                 const missing = row.muscle === 'BASICOS' && cell.loadKg === null;
+                const backoff = backoffText(cell, unit);
                 return (
                   <Pressable
                     key={cell.weekNumber}
@@ -138,31 +150,40 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
                     accessibilityRole="button"
                     accessibilityLabel={`Pautar ${row.name}, semana ${cell.weekNumber}`}
                     style={({ pressed }) => [
-                      styles.row,
+                      styles.week,
                       cell.isDeload && styles.rowDeload,
                       cell.weekNumber === grid.currentWeekIndex + 1 && styles.rowNow,
                       pressed && { opacity: 0.6 },
                     ]}
                   >
-                    <Text style={[styles.cell, styles.cellWeek]}>
-                      {cell.isDeload ? 'DL' : `s${cell.weekNumber}`}
-                    </Text>
-                    <Value text={String(cell.sets)} pinned={cell.setsOverridden} />
-                    <Value
-                      wide
-                      text={
-                        cell.repLo === cell.repHi ? `${cell.repLo}` : `${cell.repLo}–${cell.repHi}`
-                      }
-                      pinned={cell.repsOverridden}
-                    />
-                    <Value
-                      wide
-                      text={loadText(cell, unit)}
-                      pinned={cell.loadOverridden}
-                      warn={cell.needsOneRm}
-                      error={missing}
-                    />
-                    <Value text={String(cell.targetRir)} pinned={cell.rirOverridden} />
+                    <View style={styles.row}>
+                      <Text style={[styles.cell, styles.cellWeek]}>
+                        {cell.isDeload ? 'DL' : `s${cell.weekNumber}`}
+                      </Text>
+                      <Value text={String(cell.sets)} pinned={cell.setsOverridden} />
+                      <Value
+                        wide
+                        text={
+                          cell.repLo === cell.repHi ? `${cell.repLo}` : `${cell.repLo}–${cell.repHi}`
+                        }
+                        pinned={cell.repsOverridden}
+                      />
+                      <Value
+                        wide
+                        text={loadText(cell, unit)}
+                        pinned={cell.loadOverridden}
+                        warn={cell.needsOneRm}
+                        error={missing}
+                      />
+                      <Value text={String(cell.targetRir)} pinned={cell.rirOverridden} />
+                    </View>
+                    {backoff !== null ? (
+                      <Text
+                        style={[styles.backoffLine, cell.backoffNeedsOneRm && styles.valueWarn]}
+                      >
+                        BACK-OFF {backoff}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })}
@@ -261,6 +282,16 @@ function CellSheet({
   const [repHi, setRepHi] = useState(cell.repsOverridden ? String(cell.repHi) : '');
   const [rir, setRir] = useState(cell.rirOverridden ? String(cell.targetRir) : '');
   const [rest, setRest] = useState(String(cell.restSeconds));
+  const isBasico = row.muscle === 'BASICOS';
+  const [bSets, setBSets] = useState(cell.backoffSets == null ? '' : String(cell.backoffSets));
+  const [bReps, setBReps] = useState(cell.backoffReps == null ? '' : String(cell.backoffReps));
+  const [bLoad, setBLoad] = useState(
+    cell.backoffLoadPercent != null
+      ? `${trimPct(cell.backoffLoadPercent)}%`
+      : cell.backoffLoadKg != null
+        ? String(cell.backoffLoadKg)
+        : '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -284,10 +315,17 @@ function CellSheet({
       return;
     }
 
+    const backoff = isBasico ? parseBackoff(bSets, bReps, bLoad, unit) : NO_BACKOFF;
+    if ('error' in backoff) {
+      setError(backoff.error);
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
       await setPrescription(mesocycleId, row.mesocycleExerciseId, {
+        ...backoff,
         weekNumber: cell.weekNumber,
         sets: numberOrNull(sets),
         loadKg: parsed.kind === 'kg' ? parsed.value : null,
@@ -355,6 +393,21 @@ function CellSheet({
             El descanso siempre lo pautás vos: no tiene modo automático.
           </Text>
 
+          {isBasico ? (
+            <>
+              <Text style={styles.fieldLabel}>BACK-OFF (opcional)</Text>
+              <Text style={styles.hintFaint}>
+                Con back-off, sets, reps y carga de arriba son el TOP set. La carga del
+                back-off es fija: no depende de lo que salga el top.
+              </Text>
+              <View style={styles.fields}>
+                <Field label="SETS" value={bSets} onChange={setBSets} auto="—" />
+                <Field label="REPS" value={bReps} onChange={setBReps} auto="—" />
+                <Field label="CARGA (% o KG)" value={bLoad} onChange={setBLoad} auto="—" />
+              </View>
+            </>
+          ) : null}
+
           {error !== null ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
@@ -366,6 +419,9 @@ function CellSheet({
               setRepLo('');
               setRepHi('');
               setRir('');
+              setBSets('');
+              setBReps('');
+              setBLoad('');
             }}
             accessibilityRole="button"
             style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
@@ -465,7 +521,16 @@ const styles = StyleSheet.create({
     borderBottomColor: color.border,
   },
   headText: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.3 },
-  row: { flexDirection: 'row', paddingVertical: 8, alignItems: 'center' },
+  week: { paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  backoffLine: {
+    paddingLeft: 44,
+    paddingTop: 3,
+    color: color.textMuted,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
   rowNow: { backgroundColor: color.rowHighlight },
   rowDeload: { opacity: 0.6 },
 

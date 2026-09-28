@@ -54,7 +54,18 @@ export interface ExerciseCatalogOut {
   loadIncrementKg: number;
 }
 
-export interface PrescriptionIn {
+/**
+ * Back-offs detrás del top set. Solo básicos. Carga fija en kg O en % del
+ * 1RM; todo null = sin back-off.
+ */
+export interface BackoffIn {
+  backoffSets: number | null;
+  backoffReps: number | null;
+  backoffLoadKg: number | null;
+  backoffLoadPercent: number | null;
+}
+
+export interface PrescriptionIn extends BackoffIn {
   /** null = para todo el bloque. N = solo para esa semana. */
   weekNumber: number | null;
   sets: number | null;
@@ -130,7 +141,7 @@ export interface MesocycleSummaryOut {
 }
 
 /** Una fila del paso 4 opcional: la carga de UNA semana de UN ejercicio. */
-export interface WeekLoadIn {
+export interface WeekLoadIn extends BackoffIn {
   weekNumber: number;
   loadKg: number | null;
   loadPercent: number | null;
@@ -195,6 +206,8 @@ export interface PlannedSetOut {
   loggedReps: string | null;
   loggedRpe: string | null;
   done: boolean;
+  /** True en las series que van detrás del top set. */
+  backoff: boolean;
 }
 
 export interface SessionExerciseOut {
@@ -204,7 +217,11 @@ export interface SessionExerciseOut {
   muscle: string;
   /** null en la primera sesión de un ejercicio sin arranque todavía. */
   plannedLoadKg: number | null;
+  /** Con back-off, solo los top sets. */
   plannedSets: number;
+  backoffSets: number | null;
+  backoffReps: number | null;
+  backoffLoadKg: number | null;
   restSeconds: number;
   policyVersion: string;
   why: string;
@@ -363,6 +380,13 @@ export interface PlanCellOut {
   repHi: number;
   targetRir: number;
   restSeconds: number;
+  /** Back-off de la semana. null = sin back-off. */
+  backoffSets: number | null;
+  backoffReps: number | null;
+  /** null si va por % y el atleta no tiene marca. */
+  backoffLoadKg: number | null;
+  backoffLoadPercent: number | null;
+  backoffNeedsOneRm: boolean;
   setsOverridden: boolean;
   loadOverridden: boolean;
   repsOverridden: boolean;

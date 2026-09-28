@@ -32,6 +32,8 @@ interface Props {
   done: boolean;
   /** Es el próximo set pendiente de toda la sesión. */
   isNext: boolean;
+  /** Solo cuando el ejercicio lleva back-off: distingue el top de los back-offs. */
+  kind?: 'top' | 'backoff';
 
   onToggle: () => void;
   onReport: () => void;
@@ -47,6 +49,7 @@ export const SetRow = memo(function SetRow({
   loggedReps,
   done,
   isNext,
+  kind,
   onToggle,
   onReport,
 }: Props) {
@@ -61,7 +64,12 @@ export const SetRow = memo(function SetRow({
   return (
     <View style={[styles.row, isNext && styles.rowNext]}>
       <View style={styles.head}>
-        <Text style={styles.index}>{index + 1}</Text>
+        <View style={[styles.indexBox, kind !== undefined && styles.indexBoxTagged]}>
+          <Text style={styles.index}>{index + 1}</Text>
+          {kind !== undefined ? (
+            <Text style={styles.kind}>{kind === 'top' ? 'TOP' : 'B-O'}</Text>
+          ) : null}
+        </View>
 
         <View style={styles.target}>
           {hasTarget ? (
@@ -156,12 +164,14 @@ const styles = StyleSheet.create({
   },
   rowNext: { backgroundColor: color.rowHighlight },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  indexBox: { width: 14 },
+  indexBoxTagged: { width: 26 },
   index: {
     color: color.textFaint,
     fontSize: 12,
     fontVariant: ['tabular-nums'],
-    width: 14,
   },
+  kind: { color: color.accent, fontSize: 8, letterSpacing: 0.6 },
   target: { flex: 1, gap: 2 },
   prescription: {
     color: color.text,

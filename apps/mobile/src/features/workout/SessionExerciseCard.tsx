@@ -29,6 +29,7 @@ interface ResolvedSet {
   loggedWeightKg: number | null;
   loggedReps: string | null;
   done: boolean;
+  backoff: boolean;
 }
 
 interface Props {
@@ -75,7 +76,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           {exercise.plannedLoadKg === null
             ? 'Sin carga todavía'
             : formatLoad(exercise.plannedLoadKg, unit)}{' '}
-          · {exercise.plannedSets} sets
+          · {exercise.plannedSets} {exercise.backoffSets == null ? 'sets' : 'top'}
+          {exercise.backoffSets != null && exercise.backoffLoadKg != null
+            ? ` + ${exercise.backoffSets}×${exercise.backoffReps} back-off a ${formatLoad(exercise.backoffLoadKg, unit)}`
+            : ''}
         </Text>
         <Text style={styles.target}>
           descanso {formatRest(exercise.restSeconds)}
@@ -100,6 +104,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           loggedReps={s.loggedReps}
           done={s.done}
           isNext={nextPendingIndex === s.index}
+          kind={exercise.backoffSets == null ? undefined : s.backoff ? 'backoff' : 'top'}
           onToggle={() => onToggle(s.index)}
           onReport={() => onReport(s.index)}
         />

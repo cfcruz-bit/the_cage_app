@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLoadInput } from './loadInput';
+import { NO_BACKOFF, parseBackoff, parseLoadInput, parseRepsRange } from './loadInput';
 
 describe('parseLoadInput', () => {
   it('vacío es "empty", no un error', () => {
@@ -44,5 +44,41 @@ describe('parseLoadInput', () => {
   it('rechaza texto que no es un número', () => {
     expect(parseLoadInput('abc', 'kg').kind).toBe('invalid');
     expect(parseLoadInput('%', 'kg').kind).toBe('invalid');
+  });
+});
+
+describe('parseRepsRange', () => {
+  it('un número es un rango cerrado; con guion, un rango', () => {
+    expect(parseRepsRange('5')).toEqual({ lo: 5, hi: 5 });
+    expect(parseRepsRange('3-5')).toEqual({ lo: 3, hi: 5 });
+    expect(parseRepsRange(' 3 – 5 ')).toEqual({ lo: 3, hi: 5 });
+  });
+
+  it('rechaza vacío, texto, cero y rangos al revés', () => {
+    for (const raw of ['', 'abc', '0', '5-3', '1-2-3', '2.5']) {
+      expect(parseRepsRange(raw)).toBeNull();
+    }
+  });
+});
+
+describe('parseBackoff', () => {
+  it('todo vacío es "sin back-off"', () => {
+    expect(parseBackoff('', ' ', '', 'kg')).toEqual(NO_BACKOFF);
+  });
+
+  it('entero, en % o en kilos', () => {
+    expect(parseBackoff('3', '5', '75%', 'kg')).toEqual({
+      backoffSets: 3,
+      backoffReps: 5,
+      backoffLoadKg: null,
+      backoffLoadPercent: 75,
+    });
+    expect(parseBackoff('2', '3', '110', 'kg')).toMatchObject({ backoffLoadKg: 110 });
+  });
+
+  it('a medias es un error', () => {
+    expect(parseBackoff('3', '5', '', 'kg')).toHaveProperty('error');
+    expect(parseBackoff('3', '', '75%', 'kg')).toHaveProperty('error');
+    expect(parseBackoff('3', '5', '20%', 'kg')).toHaveProperty('error');
   });
 });

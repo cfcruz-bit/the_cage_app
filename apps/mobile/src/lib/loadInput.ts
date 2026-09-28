@@ -54,3 +54,55 @@ export function parseLoadInput(raw: string, unit: Unit): ParsedLoad {
   }
   return { kind: 'kg', value: toKg(value, unit) };
 }
+
+/** "5" = 5–5, "3-5" = 3–5 (vale guion corto o largo). null = vacío o inválido. */
+export function parseRepsRange(raw: string): { lo: number; hi: number } | null {
+  const parts = raw.trim().split(/\s*[-–]\s*/);
+  if (parts.length > 2) return null;
+  const [lo, hi = lo] = parts.map(Number);
+  const ok = (n: number | undefined): n is number =>
+    n !== undefined && Number.isInteger(n) && n >= 1 && n <= 100;
+  return ok(lo) && ok(hi) && hi >= lo ? { lo, hi } : null;
+}
+
+export interface Backoff {
+  backoffSets: number | null;
+  backoffReps: number | null;
+  backoffLoadKg: number | null;
+  backoffLoadPercent: number | null;
+}
+
+export const NO_BACKOFF: Backoff = {
+  backoffSets: null,
+  backoffReps: null,
+  backoffLoadKg: null,
+  backoffLoadPercent: null,
+};
+
+/**
+ * Los tres campos del back-off. Va entero (sets, reps y carga) o vacío, la
+ * misma regla que exige el servidor.
+ */
+export function parseBackoff(
+  sets: string,
+  reps: string,
+  load: string,
+  unit: Unit,
+): Backoff | { error: string } {
+  if ([sets, reps, load].every((t) => t.trim() === '')) return NO_BACKOFF;
+
+  const s = Number(sets.trim());
+  const r = Number(reps.trim());
+  const l = parseLoadInput(load, unit);
+  if (l.kind === 'invalid') return { error: `Back-off: ${l.reason}` };
+  if (!Number.isInteger(s) || s < 1 || s > 20 || !Number.isInteger(r) || r < 1 || r > 100
+    || l.kind === 'empty') {
+    return { error: 'El back-off lleva sets, reps y carga, o nada.' };
+  }
+  return {
+    backoffSets: s,
+    backoffReps: r,
+    backoffLoadKg: l.kind === 'kg' ? l.value : null,
+    backoffLoadPercent: l.kind === 'percent' ? l.value : null,
+  };
+}

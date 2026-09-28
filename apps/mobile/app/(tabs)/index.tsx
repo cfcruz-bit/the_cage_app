@@ -85,6 +85,7 @@ export default function WorkoutScreen() {
         targetWeightKg: s.targetWeightKg,
         targetReps: s.targetReps,
         why: s.why,
+        backoff: s.backoff,
         ...resolveSet(marks, exercise.id, s.index, {
           done: s.done,
           loggedWeightKg: s.loggedWeightKg,

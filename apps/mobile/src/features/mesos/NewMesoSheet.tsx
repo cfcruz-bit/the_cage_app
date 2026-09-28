@@ -49,7 +49,7 @@ import type {
 import { Chip } from '@/components/Chip';
 import { PlanGrid } from '@/features/mesos/PlanGrid';
 import { dayHeading, emptyDays, groupByDay } from '@/lib/days';
-import { type ParsedLoad, parseLoadInput } from '@/lib/loadInput';
+import { NO_BACKOFF, parseBackoff, parseLoadInput, parseRepsRange } from '@/lib/loadInput';
 import { groupByMuscle, muscleLabel } from '@/lib/muscles';
 import { useRemote } from '@/lib/remote';
 import { type Unit, toDisplay } from '@/lib/units';
@@ -641,12 +641,14 @@ export function NewMesoSheet({
                     {isBasico ? (
                       <>
                         <Text style={styles.weekGridLabel}>
-                          CARGA POR SEMANA (% o KG)
+                          SEMANA A SEMANA · carga obligatoria (% o KG)
                         </Text>
-                        <WeekLoadGrid
+                        <WeekPlanGrid
                           totalWeeks={weeks}
                           weeks={d.weeks}
                           unit={unit}
+                          defaultSets={d.startingSets}
+                          defaultReps={`${d.repLo}-${d.repHi}`}
                           onChange={(next) => patch(d.catalogId, { weeks: next })}
                         />
                         {missing.length > 0 ? (
@@ -803,91 +805,189 @@ function NumberField({
   );
 }
 
+type WeekField = 'sets' | 'reps' | 'load' | 'bSets' | 'bReps' | 'bLoad';
+
 /**
- * Una fila por semana con un campo de carga que acepta % o kilos.
+ * Una fila por semana de un básico: sets × reps @ carga, y un back-off
+ * opcional debajo. Vacío en sets o reps = los de arriba del ejercicio; la
+ * carga es obligatoria (la exige el servidor).
  *
  * El texto crudo se guarda aparte, igual que en `NumberField`: mientras se
  * escribe "102,5" no hay que perder la coma a cada tecla. Se parsea y se sube
- * al draft al salir del campo, con `parseLoadInput` — el mismo que valida la
- * celda de `PlanGrid.tsx`.
+ * al draft al salir de cualquier campo de la semana.
  */
-function WeekLoadGrid({
+function WeekPlanGrid({
   totalWeeks,
   weeks,
   unit,
+  defaultSets,
+  defaultReps,
   onChange,
 }: {
   totalWeeks: number;
   weeks: WeekLoadIn[];
   unit: Unit;
+  defaultSets: number;
+  defaultReps: string;
   onChange: (weeks: WeekLoadIn[]) => void;
 }) {
-  const [texts, setTexts] = useState<Record<number, string>>({});
+  const [texts, setTexts] = useState<Record<number, Partial<Record<WeekField, string>>>>({});
   const [errors, setErrors] = useState<Record<number, string>>({});
+  const [withBackoff, setWithBackoff] = useState<Record<number, boolean>>(() =>
+    Object.fromEntries(
+      weeks.filter((w) => w.backoffSets !== null).map((w) => [w.weekNumber, true]),
+    ),
+  );
 
-  function textFor(week: number): string {
-    const typed = texts[week];
-    if (typed !== undefined) return typed;
-    const saved = weeks.find((w) => w.weekNumber === week);
-    if (saved === undefined) return '';
-    if (saved.loadPercent !== null) return `${saved.loadPercent}%`;
-    if (saved.loadKg !== null) return String(toDisplay(saved.loadKg, unit));
+  function loadText(kg: number | null, pct: number | null): string {
+    if (pct !== null) return `${pct}%`;
+    if (kg !== null) return String(toDisplay(kg, unit));
     return '';
   }
 
-  function commit(week: number) {
-    const text = textFor(week);
-    const parsed: ParsedLoad = parseLoadInput(text, unit);
-
-    if (parsed.kind === 'invalid') {
-      setErrors((current) => ({ ...current, [week]: parsed.reason }));
-      return;
+  function textFor(week: number, field: WeekField): string {
+    const typed = texts[week]?.[field];
+    if (typed !== undefined) return typed;
+    const w = weeks.find((x) => x.weekNumber === week);
+    if (w === undefined) return '';
+    switch (field) {
+      case 'sets':
+        return w.sets === null ? '' : String(w.sets);
+      case 'reps':
+        if (w.repLo === null) return '';
+        return w.repLo === w.repHi ? String(w.repLo) : `${w.repLo}-${w.repHi}`;
+      case 'load':
+        return loadText(w.loadKg, w.loadPercent);
+      case 'bSets':
+        return w.backoffSets === null ? '' : String(w.backoffSets);
+      case 'bReps':
+        return w.backoffReps === null ? '' : String(w.backoffReps);
+      case 'bLoad':
+        return loadText(w.backoffLoadKg, w.backoffLoadPercent);
     }
-    setErrors((current) => {
-      const next = { ...current };
+  }
+
+  function commit(week: number) {
+    const t = (f: WeekField) => textFor(week, f);
+    const fail = (reason: string) => setErrors((c) => ({ ...c, [week]: reason }));
+
+    const setsText = t('sets').trim();
+    const sets = setsText === '' ? null : Number(setsText);
+    if (sets !== null && !(Number.isInteger(sets) && sets >= 1 && sets <= 20)) {
+      return fail('Los sets van de 1 a 20.');
+    }
+    const repsText = t('reps').trim();
+    const reps = repsText === '' ? null : parseRepsRange(repsText);
+    if (repsText !== '' && reps === null) {
+      return fail('Reps: un número (5) o un rango (3-5).');
+    }
+    const load = parseLoadInput(t('load'), unit);
+    if (load.kind === 'invalid') return fail(load.reason);
+    const backoff = parseBackoff(t('bSets'), t('bReps'), t('bLoad'), unit);
+    if ('error' in backoff) return fail(backoff.error);
+
+    setErrors((c) => {
+      const next = { ...c };
       delete next[week];
       return next;
     });
 
+    const entry: WeekLoadIn = {
+      weekNumber: week,
+      sets,
+      repLo: reps?.lo ?? null,
+      repHi: reps?.hi ?? null,
+      targetRir: null,
+      loadKg: load.kind === 'kg' ? load.value : null,
+      loadPercent: load.kind === 'percent' ? load.value : null,
+      ...backoff,
+    };
+    const empty =
+      sets === null && reps === null && load.kind === 'empty' && backoff.backoffSets === null;
     const rest = weeks.filter((w) => w.weekNumber !== week);
-    onChange(
-      parsed.kind === 'empty'
-        ? rest
-        : [
-            ...rest,
-            {
-              weekNumber: week,
-              loadKg: parsed.kind === 'kg' ? parsed.value : null,
-              loadPercent: parsed.kind === 'percent' ? parsed.value : null,
-              sets: null,
-              repLo: null,
-              repHi: null,
-              targetRir: null,
-            },
-          ],
+    onChange(empty ? rest : [...rest, entry]);
+  }
+
+  function input(week: number, field: WeekField, placeholder: string, label: string) {
+    return (
+      <TextInput
+        style={[styles.weekInput, errors[week] !== undefined && styles.weekInputError]}
+        value={textFor(week, field)}
+        onChangeText={(v) => setTexts((c) => ({ ...c, [week]: { ...c[week], [field]: v } }))}
+        onBlur={() => commit(week)}
+        placeholder={placeholder}
+        placeholderTextColor={color.textFaint}
+        autoCapitalize="none"
+        accessibilityLabel={`${label} de la semana ${week}`}
+      />
     );
   }
 
+  function removeBackoff(week: number) {
+    setWithBackoff((c) => ({ ...c, [week]: false }));
+    setTexts((c) => ({ ...c, [week]: { ...c[week], bSets: '', bReps: '', bLoad: '' } }));
+    onChange(weeks.map((w) => (w.weekNumber === week ? { ...w, ...NO_BACKOFF } : w)));
+  }
+
   return (
-    <View style={styles.weekGrid}>
-      {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
-        const hasError = errors[week] !== undefined;
-        return (
-          <View key={week} style={styles.weekCell}>
-            <Text style={styles.weekLabel}>S{week}</Text>
-            <TextInput
-              style={[styles.weekInput, hasError && styles.weekInputError]}
-              value={textFor(week)}
-              onChangeText={(t) => setTexts((current) => ({ ...current, [week]: t }))}
-              onBlur={() => commit(week)}
-              placeholder="75% / kg"
-              placeholderTextColor={color.textFaint}
-              autoCapitalize="none"
-              accessibilityLabel={`Carga de la semana ${week}`}
-            />
+    <View style={styles.weekList}>
+      <View style={styles.weekRow}>
+        <View style={styles.weekLabelBox} />
+        <Text style={styles.weekHead}>SETS</Text>
+        <Text style={styles.weekHead}>REPS</Text>
+        <Text style={[styles.weekHead, styles.weekLoad]}>CARGA</Text>
+      </View>
+      {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
+        <View key={week} style={styles.weekBlock}>
+          <View style={styles.weekRow}>
+            <View style={styles.weekLabelBox}>
+              <Text style={styles.weekLabel}>S{week}</Text>
+            </View>
+            <View style={styles.weekCol}>{input(week, 'sets', String(defaultSets), 'Sets')}</View>
+            <View style={styles.weekCol}>{input(week, 'reps', defaultReps, 'Reps')}</View>
+            <View style={[styles.weekCol, styles.weekLoad]}>
+              {input(week, 'load', '75% / kg', 'Carga')}
+            </View>
           </View>
-        );
-      })}
+
+          {withBackoff[week] ? (
+            <View style={styles.weekRow}>
+              <Pressable
+                onPress={() => removeBackoff(week)}
+                accessibilityRole="button"
+                accessibilityLabel={`Quitar back-off de la semana ${week}`}
+                hitSlop={6}
+                style={styles.weekLabelBox}
+              >
+                <Text style={styles.backoffTag}>B-O</Text>
+                <Ionicons name="close" size={11} color={color.accent} />
+              </Pressable>
+              <View style={styles.weekCol}>
+                {input(week, 'bSets', '3', 'Sets de back-off')}
+              </View>
+              <View style={styles.weekCol}>
+                {input(week, 'bReps', '5', 'Reps de back-off')}
+              </View>
+              <View style={[styles.weekCol, styles.weekLoad]}>
+                {input(week, 'bLoad', '70% / kg', 'Carga de back-off')}
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setWithBackoff((c) => ({ ...c, [week]: true }))}
+              accessibilityRole="button"
+              accessibilityLabel={`Añadir back-off a la semana ${week}`}
+              hitSlop={4}
+            >
+              <Text style={styles.addBackoff}>+ back-off</Text>
+            </Pressable>
+          )}
+
+          {errors[week] !== undefined ? (
+            <Text style={styles.weekError}>{errors[week]}</Text>
+          ) : null}
+        </View>
+      ))}
     </View>
   );
 }
@@ -999,9 +1099,23 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     marginTop: space.sm,
   },
-  weekGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: 4 },
-  weekCell: { width: 62, gap: 3 },
-  weekLabel: { color: color.textFaint, fontSize: 9.5, textAlign: 'center' },
+  weekList: { gap: space.sm, marginTop: 4 },
+  weekBlock: { gap: 4 },
+  weekRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  weekCol: { flex: 1 },
+  weekLoad: { flex: 1.6 },
+  weekLabelBox: { width: 38, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  weekLabel: { color: color.textFaint, fontSize: 10.5 },
+  weekHead: {
+    flex: 1,
+    color: color.textFaint,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textAlign: 'center',
+  },
+  backoffTag: { color: color.accent, fontSize: 9.5, letterSpacing: 0.5 },
+  addBackoff: { color: color.accent, fontSize: 11.5, paddingLeft: 44, paddingVertical: 2 },
+  weekError: { color: color.accent, fontSize: 11.5, paddingLeft: 44 },
   weekInput: {
     borderWidth: 1,
     borderColor: color.border,
