@@ -233,8 +233,3 @@ export async function pending(): Promise<number> {
   return row?.n ?? 0;
 }
 
-/** Solo para desarrollo y para la pantalla de ajustes. */
-export async function clearQueue(): Promise<void> {
-  const db = await openDb();
-  await db.runAsync('DELETE FROM sync_queue');
-}

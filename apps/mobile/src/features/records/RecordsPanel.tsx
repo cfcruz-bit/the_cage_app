@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -24,7 +25,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { ApiError } from '@/api/client';
-import { createRecord, listExercises, listRecords } from '@/api/endpoints';
+import { createRecord, deleteRecord, listExercises, listRecords } from '@/api/endpoints';
 import type { ExerciseCatalogOut, OneRepMaxOut, OneRepMaxSource } from '@/api/types';
 import { groupByMuscle } from '@/lib/muscles';
 import { useRemote } from '@/lib/remote';
@@ -59,6 +60,20 @@ export function RecordsPanel({
 
   const list = records.data ?? [];
 
+  function confirmDelete(r: OneRepMaxOut) {
+    Alert.alert('Borrar marca', `${r.exerciseName} · ${formatLoad(r.valueKg, unit)}`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar',
+        style: 'destructive',
+        onPress: () =>
+          void deleteRecord(athleteId, r.id).then(records.reload, (e) =>
+            Alert.alert('Error', errorText(e, 'No se pudo borrar.')),
+          ),
+      },
+    ]);
+  }
+
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
@@ -92,6 +107,16 @@ export function RecordsPanel({
             </Text>
           </View>
           <Text style={styles.value}>{formatLoad(r.valueKg, unit)}</Text>
+          {canEdit ? (
+            <Pressable
+              onPress={() => confirmDelete(r)}
+              accessibilityRole="button"
+              accessibilityLabel={`Borrar marca de ${r.exerciseName}`}
+              hitSlop={8}
+            >
+              <Ionicons name="trash-outline" size={16} color={color.textMuted} />
+            </Pressable>
+          ) : null}
         </View>
       ))}
 
@@ -107,6 +132,14 @@ export function RecordsPanel({
       ) : null}
     </View>
   );
+}
+
+function errorText(e: unknown, fallback: string): string {
+  return e instanceof ApiError
+    ? e.offline
+      ? 'Sin conexión con el servidor.'
+      : e.message
+    : fallback;
 }
 
 function AddRecordSheet({
@@ -159,13 +192,7 @@ function AddRecordSheet({
       });
       onSaved();
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? e.offline
-            ? 'Sin conexión con el servidor.'
-            : e.message
-          : 'No se pudo guardar.',
-      );
+      setError(errorText(e, 'No se pudo guardar.'));
     } finally {
       setBusy(false);
     }
@@ -311,10 +338,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  rowText: { gap: 2 },
+  rowText: { flex: 1, gap: 2 },
   name: { color: color.text, fontSize: 13.5, fontWeight: '500' },
   meta: { color: color.textMuted, fontSize: 11 },
-  value: { color: color.text, fontSize: 16, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  value: {
+    color: color.text,
+    fontSize: 16,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    marginRight: space.sm,
+  },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: {

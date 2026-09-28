@@ -22,7 +22,6 @@ import type {
   PlanGridOut,
   PrescriptionIn,
   PrescriptionOut,
-  Role,
   SessionOut,
   SetLogIn,
   SyncResult,
@@ -31,19 +30,6 @@ import type {
 } from '@/api/types';
 
 // ── Autenticación ───────────────────────────────────────────────────────────
-
-export async function register(
-  email: string,
-  password: string,
-  displayName: string,
-  role: Role,
-): Promise<UserOut> {
-  return request<UserOut>('/auth/register', {
-    method: 'POST',
-    body: { email, password, displayName, role },
-    auth: false,
-  });
-}
 
 export async function login(email: string, password: string): Promise<UserOut> {
   const pair = await request<TokenPair>('/auth/login', {
@@ -176,10 +162,6 @@ export async function currentSession(
 ): Promise<CurrentSessionOut> {
   const query = athleteId === undefined ? '' : `?athleteId=${athleteId}`;
   return request<CurrentSessionOut>(`/sessions/current${query}`);
-}
-
-export async function getSession(id: string): Promise<SessionOut> {
-  return request<SessionOut>(`/sessions/${id}`);
 }
 
 export async function pushSets(

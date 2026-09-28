@@ -15,8 +15,6 @@ Nada de esto hace commit. La unidad de trabajo la cierra el router.
 
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -39,7 +37,6 @@ from app.domain.schemas import (
 )
 from app.models import (
     DEFAULT_REST_SECONDS,
-    ExerciseFeedback,
     MesocycleExercise,
     Prescription,
     SessionExercise,
@@ -356,17 +353,6 @@ def sets_for(exercise: Exercise, plan: ExercisePlan, logs: list[SetLog]) -> list
             else None
         )
     return plan_sets(exercise, plan, log_entries)
-
-
-async def feedback_for(
-    session: AsyncSession, session_exercise_id: uuid.UUID
-) -> ExerciseFeedback | None:
-    found = await session.execute(
-        select(ExerciseFeedback).where(
-            ExerciseFeedback.session_exercise_id == session_exercise_id
-        )
-    )
-    return found.scalar_one_or_none()
 
 
 # ── Proyeccion del bloque entero ─────────────────────────────────────────────

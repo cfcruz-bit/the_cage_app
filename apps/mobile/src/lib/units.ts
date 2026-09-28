@@ -48,9 +48,3 @@ export function parseWeightInput(raw: string, unit: Unit): number | null {
   return toKg(n, unit);
 }
 
-/** Valida reps: entero entre 1 y 100, o null. */
-export function parseRepsInput(raw: string): string | null {
-  const n = parseInt(raw.trim(), 10);
-  if (!Number.isFinite(n) || n < 1 || n > 100) return null;
-  return String(n);
-}
