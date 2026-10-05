@@ -429,7 +429,7 @@ function SessionDone() {
 
 const styles = StyleSheet.create({
   list: { padding: space.lg, gap: space.md },
-  upNext: { color: color.bone, fontSize: 15, lineHeight: 20 },
+  upNext: { color: color.bone, fontSize: 14, lineHeight: 19 },
   center: {
     alignItems: 'center',
     justifyContent: 'center',

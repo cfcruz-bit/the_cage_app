@@ -42,10 +42,14 @@ export function FocusSet({
 
   return (
     <View style={styles.block}>
-      <Text style={styles.name}>{exerciseName}</Text>
-      <Text style={styles.setN}>
-        Set {setNumber} de {setCount}
-      </Text>
+      <View style={styles.head}>
+        <Text style={styles.name} numberOfLines={1}>
+          {exerciseName}
+        </Text>
+        <Text style={styles.setN}>
+          Set {setNumber} de {setCount}
+        </Text>
+      </View>
 
       {hasTarget ? (
         <View style={styles.load}>
@@ -61,32 +65,34 @@ export function FocusSet({
       {hasTarget && barbell && unit === 'kg' ? <LoadedBar kg={targetWeightKg} /> : null}
 
       {why ? (
-        <Text style={styles.why} numberOfLines={2}>
+        <Text style={styles.why} numberOfLines={1}>
           {why}
         </Text>
       ) : null}
 
-      <Pressable
-        onPress={hasTarget ? onDone : onReport}
-        accessibilityRole="button"
-        accessibilityLabel={
-          hasTarget ? `Marcar set ${setNumber} como hecho` : `Registrar el set ${setNumber}`
-        }
-        style={({ pressed }) => [styles.done, pressed && styles.pressed]}
-      >
-        <Text style={styles.doneText}>{hasTarget ? 'Hecho' : 'Registrar set'}</Text>
-      </Pressable>
-
-      {hasTarget ? (
+      <View style={styles.actions}>
         <Pressable
-          onPress={onReport}
+          onPress={hasTarget ? onDone : onReport}
           accessibilityRole="button"
-          hitSlop={8}
-          style={({ pressed }) => [styles.cant, pressed && styles.pressed]}
+          accessibilityLabel={
+            hasTarget ? `Marcar set ${setNumber} como hecho` : `Registrar el set ${setNumber}`
+          }
+          style={({ pressed }) => [styles.done, pressed && styles.pressed]}
         >
-          <Text style={styles.cantText}>No pude con este set</Text>
+          <Text style={styles.doneText}>{hasTarget ? 'Hecho' : 'Registrar set'}</Text>
         </Pressable>
-      ) : null}
+
+        {hasTarget ? (
+          <Pressable
+            onPress={onReport}
+            accessibilityRole="button"
+            accessibilityLabel={`No pude con el set ${setNumber}`}
+            style={({ pressed }) => [styles.cant, pressed && styles.pressed]}
+          >
+            <Text style={styles.cantText}>No pude</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -95,33 +101,34 @@ const styles = StyleSheet.create({
   block: {
     backgroundColor: color.slam,
     paddingHorizontal: space.lg,
-    paddingTop: space.lg,
-    paddingBottom: space.md,
-    gap: space.sm,
+    paddingVertical: space.md,
+    gap: 6,
   },
-  name: { color: color.bone, fontSize: 18, fontWeight: '600' },
-  setN: { color: color.bone, opacity: 0.8, fontSize: 13, marginTop: -6 },
+  head: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+  name: { flex: 1, color: color.bone, fontSize: 17, fontWeight: '600' },
+  setN: { color: color.bone, opacity: 0.8, fontSize: 13 },
   load: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 10 },
   num: {
     ...condensed,
     color: color.bone,
-    fontSize: 84,
-    lineHeight: 84,
+    fontSize: 64,
+    lineHeight: 64,
     fontVariant: ['tabular-nums'],
   },
-  unit: { ...condensed, color: color.bone, fontSize: 28 },
+  unit: { ...condensed, color: color.bone, fontSize: 24 },
   noTarget: { color: color.bone, fontSize: 20, fontWeight: '600' },
   why: { color: color.bone, opacity: 0.85, fontSize: 13.5, lineHeight: 18 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: 2 },
   done: {
+    flex: 1,
     backgroundColor: color.bone,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 48,
     borderRadius: radius.chip,
-    marginTop: space.xs,
   },
-  doneText: { ...condensed, color: color.onBone, fontSize: 24, letterSpacing: 0.5 },
-  cant: { alignSelf: 'center', paddingVertical: space.sm, paddingHorizontal: space.md },
-  cantText: { color: color.bone, opacity: 0.85, fontSize: 13 },
+  doneText: { ...condensed, color: color.onBone, fontSize: 22, letterSpacing: 0.5 },
+  cant: { minHeight: 48, justifyContent: 'center', paddingHorizontal: space.md },
+  cantText: { color: color.bone, fontSize: 14 },
   pressed: { opacity: 0.7 },
 });

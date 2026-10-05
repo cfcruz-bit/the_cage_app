@@ -109,8 +109,10 @@ export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
 
   return (
     <View style={styles.block}>
-      <Text style={styles.label}>{done ? 'Descanso completo' : 'Descanso'}</Text>
-      <Text style={styles.time}>{formatRest(Math.max(0, left))}</Text>
+      <View style={styles.head}>
+        <Text style={styles.time}>{formatRest(Math.max(0, left))}</Text>
+        <Text style={styles.label}>{done ? 'Descanso completo' : 'Descanso'}</Text>
+      </View>
       <View style={styles.track}>
         <Animated.View
           style={[
@@ -140,16 +142,16 @@ const styles = StyleSheet.create({
   block: {
     backgroundColor: color.slam,
     paddingHorizontal: space.lg,
-    paddingTop: space.lg,
-    paddingBottom: space.lg,
-    gap: space.sm,
+    paddingVertical: space.md,
+    gap: 6,
   },
+  head: { flexDirection: 'row', alignItems: 'baseline', gap: space.md },
   label: { color: color.bone, opacity: 0.8, fontSize: 14 },
   time: {
     ...condensed,
     color: color.bone,
-    fontSize: 104,
-    lineHeight: 104,
+    fontSize: 72,
+    lineHeight: 72,
     fontVariant: ['tabular-nums'],
   },
   track: {
@@ -163,9 +165,9 @@ const styles = StyleSheet.create({
     backgroundColor: color.bone,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 48,
     borderRadius: radius.chip,
-    marginTop: space.sm,
+    marginTop: 2,
   },
-  skipText: { ...condensed, color: color.onBone, fontSize: 24, letterSpacing: 0.5 },
+  skipText: { ...condensed, color: color.onBone, fontSize: 22, letterSpacing: 0.5 },
 });
