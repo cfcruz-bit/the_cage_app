@@ -347,10 +347,12 @@ export default function WorkoutScreen() {
           <View
             key={exercise.id}
             onLayout={(e) => {
-              const first = cardY.current[exercise.id] === undefined;
-              cardY.current[exercise.id] = e.nativeEvent.layout.y;
-              // Al abrir la sesión a medias: sin esto la lista arranca arriba.
-              if (first && exercise.id === focusId) scrollToCard(e.nativeEvent.layout.y, false);
+              const y = e.nativeEvent.layout.y;
+              const prev = cardY.current[exercise.id];
+              cardY.current[exercise.id] = y;
+              // La tarjeta en curso se mueve al abrir la sesión a medias y cuando
+              // la de arriba crece con su fila de feedback: en ambos casos se sigue.
+              if (exercise.id === focusId && prev !== y) scrollToCard(y, prev !== undefined);
             }}
           >
             <SessionExerciseCard
