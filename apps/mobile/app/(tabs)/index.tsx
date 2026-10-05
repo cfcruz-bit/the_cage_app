@@ -15,7 +15,7 @@
  * aquí genera la sesión.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -131,6 +131,19 @@ export default function WorkoutScreen() {
       },
     [toggleSet],
   );
+
+  // La lista sigue al ejercicio en curso: al terminar uno, el siguiente sube
+  // solo bajo el bloque del set activo.
+  const listRef = useRef<ScrollView>(null);
+  const cardY = useRef<Record<string, number>>({});
+  const focusId = summary.firstPending?.exerciseId ?? null;
+  const scrollToCard = useCallback((y: number, animated: boolean) => {
+    listRef.current?.scrollTo({ y: Math.max(0, y - space.sm), animated });
+  }, []);
+  useEffect(() => {
+    const y = focusId === null ? undefined : cardY.current[focusId];
+    if (y !== undefined) scrollToCard(y, true);
+  }, [focusId, scrollToCard]);
 
   if (loading && session === null) {
     return (
@@ -319,6 +332,7 @@ export default function WorkoutScreen() {
       ) : null}
 
       <ScrollView
+        ref={listRef}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -330,33 +344,42 @@ export default function WorkoutScreen() {
         }
       >
         {resolved.map(({ exercise, sets }) => (
-          <SessionExerciseCard
+          <View
             key={exercise.id}
-            exercise={exercise}
-            sets={sets}
-            unit={unit}
-            feedbackSaved={feedbackDone[exercise.id] === true}
-            nextPendingIndex={
-              summary.firstPending?.exerciseId === exercise.id
-                ? summary.firstPending.index
-                : null
-            }
-            onToggle={(index) => {
-              const s = sets.find((x) => x.index === index);
-              // Sin objetivo no hay nada que asumir al tocar el check: ese
-              // caso lo resuelve SetRow abriendo el reporte, no este callback.
-              if (s === undefined || s.targetWeightKg === null || s.targetReps === null) {
-                return;
-              }
-              onToggle(exercise.id, exercise.restSeconds)(
-                index,
-                s.targetWeightKg,
-                s.targetReps,
-              );
+            onLayout={(e) => {
+              const first = cardY.current[exercise.id] === undefined;
+              cardY.current[exercise.id] = e.nativeEvent.layout.y;
+              // Al abrir la sesión a medias: sin esto la lista arranca arriba.
+              if (first && exercise.id === focusId) scrollToCard(e.nativeEvent.layout.y, false);
             }}
-            onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
-            onFeedback={() => setFeedbackFor(exercise.id)}
-          />
+          >
+            <SessionExerciseCard
+              exercise={exercise}
+              sets={sets}
+              unit={unit}
+              feedbackSaved={feedbackDone[exercise.id] === true}
+              nextPendingIndex={
+                summary.firstPending?.exerciseId === exercise.id
+                  ? summary.firstPending.index
+                  : null
+              }
+              onToggle={(index) => {
+                const s = sets.find((x) => x.index === index);
+                // Sin objetivo no hay nada que asumir al tocar el check: ese
+                // caso lo resuelve SetRow abriendo el reporte, no este callback.
+                if (s === undefined || s.targetWeightKg === null || s.targetReps === null) {
+                  return;
+                }
+                onToggle(exercise.id, exercise.restSeconds)(
+                  index,
+                  s.targetWeightKg,
+                  s.targetReps,
+                );
+              }}
+              onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
+              onFeedback={() => setFeedbackFor(exercise.id)}
+            />
+          </View>
         ))}
 
         {summary.total > 0 && summary.done === summary.total ? (
