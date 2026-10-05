@@ -138,7 +138,7 @@ export const SetRow = memo(function SetRow({
           <Ionicons
             name={done ? 'checkmark' : 'ellipse-outline'}
             size={done ? 19 : 15}
-            color={done ? color.onAccent : color.textFaint}
+            color={done ? color.onBone : color.textFaint}
           />
         </Pressable>
       </View>
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkDone: { backgroundColor: color.accent, borderColor: color.accent },
+  checkDone: { backgroundColor: color.bone, borderColor: color.bone },
   checkPending: { backgroundColor: 'transparent', borderColor: color.border },
   pressed: { opacity: 0.6 },
   why: { color: color.textMuted, fontSize: 12, marginLeft: 26 },

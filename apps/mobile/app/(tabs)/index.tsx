@@ -32,6 +32,8 @@ import type { SessionOut } from '@/api/types';
 import { Screen } from '@/components/Screen';
 import { DeviationSheet } from '@/features/workout/DeviationSheet';
 import { FeedbackSheet } from '@/features/feedback/FeedbackSheet';
+import { FocusSet } from '@/features/workout/FocusSet';
+import { LoadedBar } from '@/features/workout/LoadedBar';
 import { RestTimer } from '@/features/workout/RestTimer';
 import { SessionExerciseCard } from '@/features/workout/SessionExerciseCard';
 import { GenerateSessionSheet } from '@/features/workout/GenerateSessionSheet';
@@ -41,7 +43,7 @@ import { useSession } from '@/stores/session';
 import { useSync } from '@/stores/sync';
 import { resolveSet, useWorkout } from '@/stores/workout';
 import { color, radius, space } from '@/theme/tokens';
-import { formatLoad } from '@/lib/units';
+import { formatLoad, formatNumber } from '@/lib/units';
 
 export default function WorkoutScreen() {
   const isCoach = useApp((s) => s.role) === 'coach';
@@ -221,6 +223,21 @@ export default function WorkoutScreen() {
   }
 
   const active = resolved.find((r) => r.exercise.id === feedbackFor);
+
+  /** El set que toca: lo que ocupa la parte de arriba de la pantalla. */
+  const focus = (() => {
+    const fp = summary.firstPending;
+    if (fp === null) return null;
+    const row = resolved.find((r) => r.exercise.id === fp.exerciseId);
+    const set = row?.sets.find((x) => x.index === fp.index);
+    if (row === undefined || set === undefined) return null;
+    return {
+      exercise: row.exercise,
+      set,
+      setCount: row.sets.length,
+      barbell: /^(barra|barbell)/i.test(row.exercise.exercise?.equipment ?? ''),
+    };
+  })();
   const deviationTarget =
     deviation === null
       ? null
@@ -260,6 +277,45 @@ export default function WorkoutScreen() {
               : `${pending} ${pending === 1 ? 'cambio' : 'cambios'} por subir.`}
           </Text>
         </View>
+      ) : null}
+
+      {rest !== null ? (
+        <RestTimer seconds={rest.seconds} runKey={rest.key} onDismiss={() => setRest(null)}>
+          {focus !== null && focus.set.targetWeightKg !== null ? (
+            <>
+              <Text style={styles.upNext}>
+                Sigue el set {focus.set.index + 1} de {focus.exercise.name}:{' '}
+                {formatNumber(focus.set.targetWeightKg, unit)} {unit} × {focus.set.targetReps}
+              </Text>
+              {focus.barbell && unit === 'kg' ? (
+                <LoadedBar kg={focus.set.targetWeightKg} />
+              ) : null}
+            </>
+          ) : null}
+        </RestTimer>
+      ) : focus !== null ? (
+        <FocusSet
+          exerciseName={focus.exercise.name}
+          setNumber={focus.set.index + 1}
+          setCount={focus.setCount}
+          unit={unit}
+          targetWeightKg={focus.set.targetWeightKg}
+          targetReps={focus.set.targetReps}
+          why={focus.set.why || focus.exercise.why}
+          barbell={focus.barbell}
+          onDone={() => {
+            const { targetWeightKg, targetReps } = focus.set;
+            if (targetWeightKg === null || targetReps === null) return;
+            onToggle(focus.exercise.id, focus.exercise.restSeconds)(
+              focus.set.index,
+              targetWeightKg,
+              targetReps,
+            );
+          }}
+          onReport={() =>
+            setDeviation({ exerciseId: focus.exercise.id, index: focus.set.index })
+          }
+        />
       ) : null}
 
       <ScrollView
@@ -307,14 +363,6 @@ export default function WorkoutScreen() {
           <SessionDone />
         ) : null}
       </ScrollView>
-
-      {rest !== null ? (
-        <RestTimer
-          seconds={rest.seconds}
-          runKey={rest.key}
-          onDismiss={() => setRest(null)}
-        />
-      ) : null}
 
       <FeedbackSheet
         exercise={active?.exercise.exercise ?? null}
@@ -380,7 +428,8 @@ function SessionDone() {
 }
 
 const styles = StyleSheet.create({
-  list: { padding: space.lg, paddingTop: space.sm, gap: space.md, paddingBottom: 96 },
+  list: { padding: space.lg, gap: space.md },
+  upNext: { color: color.bone, fontSize: 15, lineHeight: 20 },
   center: {
     alignItems: 'center',
     justifyContent: 'center',

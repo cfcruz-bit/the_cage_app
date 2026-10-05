@@ -1,15 +1,16 @@
 /**
  * Descanso entre series, con el tiempo que pautó el coach.
  *
- * Aparece al marcar un set y cuenta hacia atrás. El atleta puede saltarlo —el
+ * Aparece al marcar un set, en el sitio del set activo, y cuenta hacia atrás
+ * a un tamaño que se lee con el móvil en el suelo. El atleta puede saltarlo —el
  * cronómetro informa, no encierra— pero no puede cambiar la duración: eso lo
  * decide el coach en el plan.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { color, palette, radius, space } from '@/theme/tokens';
+import { color, condensed, radius, space } from '@/theme/tokens';
 import { formatRest } from '@/lib/prescription';
 
 // El setInterval muere con la app en segundo plano; la alarma la agenda el
@@ -61,9 +62,11 @@ interface Props {
   /** Cambia en cada set marcado: reinicia la cuenta. */
   runKey: string | null;
   onDismiss: () => void;
+  /** Lo que viene después: el siguiente set y su barra. */
+  children?: ReactNode;
 }
 
-export function RestTimer({ seconds, runKey, onDismiss }: Props) {
+export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
   const [left, setLeft] = useState(seconds);
   const progress = useRef(new Animated.Value(1)).current;
 
@@ -105,76 +108,64 @@ export function RestTimer({ seconds, runKey, onDismiss }: Props) {
   const done = left <= 0;
 
   return (
-    <View style={styles.bar}>
-      <Animated.View
-        style={[
-          styles.fill,
-          {
-            width: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0%', '100%'],
-            }),
-          },
-        ]}
-      />
-      <View style={styles.content}>
-        <Text style={styles.label}>{done ? 'DESCANSO COMPLETO' : 'DESCANSO'}</Text>
-        <Text style={[styles.time, done && styles.timeDone]}>
-          {formatRest(Math.max(0, left))}
-        </Text>
-        <View style={styles.spacer} />
-        <Pressable
-          onPress={onDismiss}
-          accessibilityRole="button"
-          accessibilityLabel={done ? 'Cerrar' : 'Saltar descanso'}
-          hitSlop={10}
-          style={({ pressed }) => [styles.skip, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.skipText}>{done ? 'Cerrar' : 'Saltar'}</Text>
-        </Pressable>
+    <View style={styles.block}>
+      <Text style={styles.label}>{done ? 'Descanso completo' : 'Descanso'}</Text>
+      <Text style={styles.time}>{formatRest(Math.max(0, left))}</Text>
+      <View style={styles.track}>
+        <Animated.View
+          style={[
+            styles.fill,
+            {
+              width: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
+            },
+          ]}
+        />
       </View>
+      {children}
+      <Pressable
+        onPress={onDismiss}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.skip, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.skipText}>{done ? 'Siguiente set' : 'Saltar descanso'}</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    position: 'absolute',
-    left: space.lg,
-    right: space.lg,
-    bottom: space.lg,
-    borderRadius: radius.card,
-    backgroundColor: palette.n900,
-    borderWidth: 1,
-    borderColor: color.border,
-    overflow: 'hidden',
-  },
-  // Explícito a propósito: `StyleSheet.absoluteFillObject` no existe en React
-  // Native 0.86 (solo `absoluteFill`), y al desaparecer dejaba el estilo sin
-  // posicionamiento sin avisar de nada.
-  fill: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'rgba(224,74,58,0.16)',
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    paddingVertical: space.md,
+  block: {
+    backgroundColor: color.slam,
     paddingHorizontal: space.lg,
+    paddingTop: space.lg,
+    paddingBottom: space.lg,
+    gap: space.sm,
   },
-  label: { color: color.textFaint, fontSize: 10, letterSpacing: 2 },
+  label: { color: color.bone, opacity: 0.8, fontSize: 14 },
   time: {
-    color: color.text,
-    fontSize: 20,
-    fontWeight: '700',
+    ...condensed,
+    color: color.bone,
+    fontSize: 104,
+    lineHeight: 104,
     fontVariant: ['tabular-nums'],
   },
-  timeDone: { color: color.accent },
-  spacer: { flex: 1 },
-  skip: { paddingHorizontal: space.sm, paddingVertical: 4 },
-  skipText: { color: color.accent, fontSize: 13, fontWeight: '600' },
+  track: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    overflow: 'hidden',
+  },
+  fill: { height: 6, backgroundColor: color.bone },
+  skip: {
+    backgroundColor: color.bone,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+    borderRadius: radius.chip,
+    marginTop: space.sm,
+  },
+  skipText: { ...condensed, color: color.onBone, fontSize: 24, letterSpacing: 0.5 },
 });

@@ -5,6 +5,8 @@
  * está aquí, se añade aquí primero.
  */
 
+import { Platform } from 'react-native';
+
 export const palette = {
   accent: '#e04a3a',
   accentEdge: '#c2231b',
@@ -47,6 +49,21 @@ export const color = {
   danger: palette.a300,
   /** Fondo del corte a pantalla completa al entrar en un rol. */
   slam: palette.slam,
+  /** Hueso: el botón principal y el check hecho. Sobre el rojo profundo y sobre negro. */
+  bone: palette.a100,
+  onBone: palette.black,
+} as const;
+
+/** Colores reales de los discos, por kilo. Solo para el dibujo de la barra. */
+export const plate = {
+  25: '#d2362c',
+  20: '#2a5fb8',
+  15: '#e3b322',
+  10: '#2f8f4e',
+  5: '#e8e4da',
+  2.5: '#d2362c',
+  1.25: '#a9aaad',
+  steel: '#8f9094',
 } as const;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
@@ -62,6 +79,15 @@ export const type = {
   label: { fontSize: 10.5, fontWeight: '500', letterSpacing: 2.9, textTransform: 'uppercase' },
   numeric: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
 } as const;
+
+/**
+ * Condensada del sistema para las cifras que se leen a un metro: la carga del
+ * set activo y la cuenta atrás. Sin fuente propia: cada plataforma trae una.
+ */
+export const condensed = Platform.select({
+  ios: { fontFamily: 'AvenirNextCondensed-Heavy' },
+  default: { fontFamily: 'sans-serif-condensed', fontWeight: '700' },
+}) as { fontFamily: string; fontWeight?: '700' };
 
 /** Estilo de chip seleccionable, el patrón más repetido del prototipo. */
 export function chipStyle(active: boolean) {
