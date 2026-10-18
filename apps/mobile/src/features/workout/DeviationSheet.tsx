@@ -69,12 +69,12 @@ export function DeviationSheet({ target, unit, onSave, onReset, onClose }: Props
           </Text>
 
           <View style={styles.prescribed}>
-            <Text style={styles.prescribedLabel}>TU COACH PAUTÓ</Text>
+            <Text style={styles.prescribedLabel}>Tu coach pautó</Text>
             <Text style={styles.prescribedValue}>
               {target === null
                 ? ''
                 : target.targetWeightKg === null
-                  ? 'Sin carga pautada — registrá lo que usaste'
+                  ? 'Sin carga pautada — registra lo que usaste'
                   : `${formatNumber(target.targetWeightKg, unit)} ${unit} × ${target.targetReps}`}
             </Text>
           </View>
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     borderLeftColor: color.accent,
     gap: 3,
   },
-  prescribedLabel: { color: color.textFaint, fontSize: 10, letterSpacing: 2 },
+  prescribedLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   prescribedValue: {
     color: color.text,
     fontSize: 17,

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ErrorBoundaryProps, Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -13,7 +13,7 @@ import { useApp } from '@/stores/app';
 import { useAuth, refreshProfile } from '@/stores/auth';
 import { useSession } from '@/stores/session';
 import { useAutoSync } from '@/sync/useAutoSync';
-import { color } from '@/theme/tokens';
+import { color, condensed, radius, space } from '@/theme/tokens';
 
 export default function RootLayout() {
   const ready = useSession((s) => s.ready);
@@ -117,6 +117,64 @@ function expired(user: { role: string; accessEndsOn: string | null; daysLeft: nu
   return user.daysLeft === null;
 }
 
+/**
+ * Si una pantalla revienta al dibujarse, esto ocupa su lugar en vez de cerrar
+ * la app. Lo marcado ya está en SQLite y en la cola de subida, así que
+ * reintentar no pierde nada.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    console.error('[cage] una pantalla falló al dibujarse:', error);
+  }, [error]);
+
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <View style={styles.error}>
+        <Text style={styles.errorTitle}>Esta pantalla no cargó</Text>
+        <Text style={styles.errorBody}>Los sets que marcaste están guardados en el teléfono.</Text>
+        <Pressable
+          onPress={() => void retry()}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.retry, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.retryText}>Reintentar</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            router.replace('/');
+            void retry();
+          }}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.home, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.homeText}>Volver al inicio</Text>
+        </Pressable>
+      </View>
+    </SafeAreaProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center' },
+  error: {
+    flex: 1,
+    backgroundColor: color.bg,
+    justifyContent: 'center',
+    paddingHorizontal: space.xl,
+    gap: space.md,
+  },
+  errorTitle: { color: color.text, fontSize: 20, fontWeight: '600' },
+  errorBody: { color: color.textMuted, fontSize: 15, lineHeight: 21 },
+  retry: {
+    backgroundColor: color.bone,
+    minHeight: 48,
+    borderRadius: radius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: space.sm,
+  },
+  retryText: { ...condensed, color: color.onBone, fontSize: 22, letterSpacing: 0.5 },
+  home: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  homeText: { color: color.textMuted, fontSize: 15 },
 });

@@ -42,7 +42,7 @@ import { useApp } from '@/stores/app';
 import { useSession } from '@/stores/session';
 import { useSync } from '@/stores/sync';
 import { resolveSet, useWorkout } from '@/stores/workout';
-import { color, radius, space } from '@/theme/tokens';
+import { color, condensed, radius, space } from '@/theme/tokens';
 import { formatLoad, formatNumber } from '@/lib/units';
 
 export default function WorkoutScreen() {
@@ -165,7 +165,7 @@ export default function WorkoutScreen() {
               <Ionicons name="barbell-outline" size={30} color={color.accent} />
               <Text style={styles.emptyTitle}>{nextUpText(next)}</Text>
               <Text style={styles.emptyBody}>
-                {error ?? 'Es tu siguiente día del mesociclo.'}
+                {error ?? 'Es tu siguiente día del bloque.'}
               </Text>
               <Pressable
                 onPress={() => void openNext()}
@@ -185,7 +185,7 @@ export default function WorkoutScreen() {
               <Ionicons name="trophy-outline" size={30} color={color.accent} />
               <Text style={styles.emptyTitle}>Bloque completado</Text>
               <Text style={styles.emptyBody}>
-                Hiciste todos los días de tu mesociclo. Tu coach te prepara el siguiente.
+                Hiciste todos los días de tu bloque. Tu coach te prepara el siguiente.
               </Text>
             </>
           ) : (
@@ -196,8 +196,8 @@ export default function WorkoutScreen() {
               </Text>
               <Text style={styles.emptyBody}>
                 {isCoach
-                  ? 'Generá la sesión del día para tu atleta desde un mesociclo activo.'
-                  : 'Todavía no tienes un mesociclo activo. En cuanto tu coach lo cree, aparece acá.'}
+                  ? 'Genera la sesión del día para tu atleta desde un bloque activo.'
+                  : 'Todavía no tienes un bloque activo. En cuanto tu coach lo cree, aparece aquí.'}
               </Text>
             </>
           )}
@@ -385,7 +385,14 @@ export default function WorkoutScreen() {
         ))}
 
         {summary.total > 0 && summary.done === summary.total ? (
-          <SessionDone />
+          <SessionDone
+            items={resolved.map((r) => ({
+              id: r.exercise.id,
+              name: r.exercise.name,
+              feedback: feedbackDone[r.exercise.id] === true,
+            }))}
+            onFeedback={setFeedbackFor}
+          />
         ) : null}
       </ScrollView>
 
@@ -420,19 +427,49 @@ export default function WorkoutScreen() {
   );
 }
 
-/** Lo que se ve al terminar. Cerrar la sesión es lo que la hace contar. */
-function SessionDone() {
+/**
+ * Lo que se ve al terminar. Terminar el entreno es lo que hace que cuente.
+ *
+ * Lista los ejercicios con su feedback: el que falta se da desde aquí mismo, y
+ * sin él el motor no ajusta ese ejercicio la semana que viene.
+ */
+function SessionDone({
+  items,
+  onFeedback,
+}: {
+  items: { id: string; name: string; feedback: boolean }[];
+  onFeedback: (exerciseId: string) => void;
+}) {
   const complete = useWorkout((s) => s.complete);
   const load = useWorkout((s) => s.load);
   const [closing, setClosing] = useState(false);
+  const missing = items.some((i) => !i.feedback);
 
   return (
     <View style={styles.doneBanner}>
-      <Text style={styles.doneTitle}>Sesión completa</Text>
-      <Text style={styles.doneText}>
-        Da feedback de cada ejercicio antes de cerrar: es lo que el motor usa
-        para ajustar la semana que viene.
-      </Text>
+      <Text style={styles.doneTitle}>Entreno completo</Text>
+      {items.map((i) => (
+        <Pressable
+          key={i.id}
+          onPress={() => onFeedback(i.id)}
+          disabled={i.feedback}
+          accessibilityRole="button"
+          accessibilityLabel={i.feedback ? `${i.name}: feedback dado` : `Dar feedback de ${i.name}`}
+          style={({ pressed }) => [styles.doneRow, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.doneName} numberOfLines={1}>
+            {i.name}
+          </Text>
+          <Text style={[styles.doneState, !i.feedback && styles.doneMissing]}>
+            {i.feedback ? 'feedback dado' : 'dar feedback'}
+          </Text>
+        </Pressable>
+      ))}
+      {missing ? (
+        <Text style={styles.doneText}>
+          Sin feedback, el motor no ajusta ese ejercicio la semana que viene.
+        </Text>
+      ) : null}
       <Pressable
         onPress={() => {
           setClosing(true);
@@ -441,12 +478,12 @@ function SessionDone() {
         disabled={closing}
         accessibilityRole="button"
         style={({ pressed }) => [
-          styles.action,
+          styles.finish,
           closing && { opacity: 0.5 },
           pressed && !closing && { opacity: 0.7 },
         ]}
       >
-        <Text style={styles.actionText}>CERRAR SESIÓN</Text>
+        <Text style={styles.finishText}>Terminar entreno</Text>
       </Pressable>
     </View>
   );
@@ -490,18 +527,35 @@ const styles = StyleSheet.create({
     borderColor: color.border,
     borderRadius: radius.chip,
   },
-  bannerText: { color: color.textMuted, fontSize: 11.5, flex: 1, lineHeight: 16 },
+  bannerText: { color: color.textMuted, fontSize: 12, flex: 1, lineHeight: 16 },
 
   doneBanner: {
     padding: space.md,
     borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.accent,
-    backgroundColor: color.rowHighlight,
-    gap: space.sm,
+    backgroundColor: color.slam,
+    gap: space.xs,
   },
-  doneTitle: { color: color.text, fontSize: 15, fontWeight: '600' },
-  doneText: { color: color.textMuted, fontSize: 12.5, lineHeight: 18 },
+  doneTitle: { color: color.bone, fontSize: 16, fontWeight: '600', marginBottom: space.xs },
+  doneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    minHeight: 44,
+  },
+  doneName: { flex: 1, color: color.bone, fontSize: 14 },
+  doneState: { color: color.bone, opacity: 0.75, fontSize: 13 },
+  doneMissing: { opacity: 1, fontWeight: '600', textDecorationLine: 'underline' },
+  doneText: { color: color.bone, opacity: 0.85, fontSize: 13, lineHeight: 18 },
+  finish: {
+    backgroundColor: color.bone,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: radius.chip,
+    marginTop: space.sm,
+  },
+  finishText: { ...condensed, color: color.onBone, fontSize: 22, letterSpacing: 0.5 },
 
   action: {
     backgroundColor: color.accent,

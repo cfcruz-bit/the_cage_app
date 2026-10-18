@@ -320,7 +320,7 @@ export function NewMesoSheet({
     try {
       const meso = await createMesocycle({
         athleteId,
-        name: name.trim() || 'Mesociclo',
+        name: name.trim() || 'Bloque',
         totalWeeks: weeks,
         aggressiveness,
         goal,
@@ -383,11 +383,11 @@ export function NewMesoSheet({
         <View style={styles.head}>
           <View style={styles.headText}>
             <Text style={styles.title}>
-              {createdMesoId !== null ? 'PAUTAR SEMANAS' : 'NUEVO MESOCICLO'}
+              {createdMesoId !== null ? 'PAUTAR SEMANAS' : 'NUEVO BLOQUE'}
             </Text>
             <Text style={styles.subtitle}>
               {createdMesoId !== null
-                ? 'Ya está creado. Ajustá lo que quieras; cerrar no pierde nada.'
+                ? 'Ya está creado. Ajusta lo que quieras; cerrar no pierde nada.'
                 : SUBTITLES[step]}
             </Text>
           </View>
@@ -411,7 +411,7 @@ export function NewMesoSheet({
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {step === 1 ? (
             <>
-              <Text style={styles.label}>ATLETA</Text>
+              <Text style={styles.label}>Atleta</Text>
               {athletes.length === 0 ? (
                 <Text style={styles.help}>
                   Todavía no llevas a nadie. Pídele al administrador que te
@@ -430,17 +430,17 @@ export function NewMesoSheet({
                 </View>
               )}
 
-              <Text style={styles.label}>NOMBRE</Text>
+              <Text style={styles.label}>Nombre</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
                 placeholder="Push/Pull/Legs"
                 placeholderTextColor={color.textFaint}
-                accessibilityLabel="Nombre del mesociclo"
+                accessibilityLabel="Nombre del bloque"
               />
 
-              <Text style={styles.label}>OBJETIVO</Text>
+              <Text style={styles.label}>Objetivo</Text>
               <View style={styles.chips}>
                 {GOALS.map((g) => (
                   <Chip
@@ -453,7 +453,7 @@ export function NewMesoSheet({
               </View>
               <Text style={styles.help}>{GOAL_PRESET[goal].help}</Text>
 
-              <Text style={styles.label}>DURACIÓN</Text>
+              <Text style={styles.label}>Duración</Text>
               <View style={styles.chips}>
                 {WEEKS.map((w) => (
                   <Chip
@@ -469,7 +469,7 @@ export function NewMesoSheet({
                 recorta el volumen.
               </Text>
 
-              <Text style={styles.label}>DÍAS POR SEMANA</Text>
+              <Text style={styles.label}>Días por semana</Text>
               <View style={styles.chips}>
                 {DAYS_PER_WEEK.map((n) => (
                   <Chip
@@ -484,7 +484,7 @@ export function NewMesoSheet({
                 El reparto de ejercicios entre los días es fijo para todo el bloque.
               </Text>
 
-              <Text style={styles.label}>AGRESIVIDAD</Text>
+              <Text style={styles.label}>Agresividad</Text>
               <View style={styles.chips}>
                 {AGGRESSIVENESS.map((a) => (
                   <Chip
@@ -528,7 +528,7 @@ export function NewMesoSheet({
               />
               <Text style={styles.help}>
                 {drafts.length === 0
-                  ? 'Elegí los ejercicios del bloque.'
+                  ? 'Elige los ejercicios del bloque.'
                   : `${drafts.length} elegidos.`}
               </Text>
               {daysWithoutExercises.length > 0 ? (
@@ -551,7 +551,7 @@ export function NewMesoSheet({
               {grouped.map((group) => (
                 <View key={group.muscle} style={styles.group}>
                   <View style={styles.groupHead}>
-                    <Text style={styles.groupTitle}>{group.label.toUpperCase()}</Text>
+                    <Text style={styles.groupTitle}>{group.label}</Text>
                     <Text style={styles.groupCount}>{group.items.length}</Text>
                   </View>
 
@@ -627,12 +627,12 @@ export function NewMesoSheet({
 
                     <View style={styles.fields}>
                       <NumberField
-                        label="REPS"
+                        label="Reps"
                         value={d.startingReps}
                         onChange={(v) => patch(d.catalogId, { startingReps: v })}
                       />
                       <NumberField
-                        label="SETS"
+                        label="Sets"
                         value={d.startingSets}
                         onChange={(v) => patch(d.catalogId, { startingSets: v })}
                       />
@@ -641,7 +641,7 @@ export function NewMesoSheet({
                     {isBasico ? (
                       <>
                         <Text style={styles.weekGridLabel}>
-                          SEMANA A SEMANA · carga obligatoria (% o KG)
+                          Semana a semana: carga obligatoria (% o kg)
                         </Text>
                         <WeekPlanGrid
                           totalWeeks={weeks}
@@ -677,7 +677,7 @@ export function NewMesoSheet({
         {step === 3 && pendientes.length > 0 ? (
           <View style={styles.blocker}>
             <Text style={styles.blockerTitle}>
-              Falta carga para poder crear el mesociclo
+              Falta carga para poder crear el bloque
             </Text>
             {pendientes.map((p) => (
               <Text key={p.name} style={styles.blockerItem}>
@@ -933,9 +933,9 @@ function WeekPlanGrid({
     <View style={styles.weekList}>
       <View style={styles.weekRow}>
         <View style={styles.weekLabelBox} />
-        <Text style={styles.weekHead}>SETS</Text>
-        <Text style={styles.weekHead}>REPS</Text>
-        <Text style={[styles.weekHead, styles.weekLoad]}>CARGA</Text>
+        <Text style={styles.weekHead}>Sets</Text>
+        <Text style={styles.weekHead}>Reps</Text>
+        <Text style={[styles.weekHead, styles.weekLoad]}>Carga</Text>
       </View>
       {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
         <View key={week} style={styles.weekBlock}>
@@ -1019,8 +1019,8 @@ const styles = StyleSheet.create({
   body: { padding: space.lg, gap: space.sm, paddingBottom: space.xl },
   label: {
     color: color.textMuted,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: space.sm,
   },
   help: { color: color.textFaint, fontSize: 12, lineHeight: 17 },
@@ -1052,8 +1052,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.border,
   },
-  groupTitle: { color: color.accent, fontSize: 10, letterSpacing: 2 },
-  groupCount: { color: color.textFaint, fontSize: 10.5 },
+  groupTitle: { color: color.accent, fontSize: 12, letterSpacing: 0.2 },
+  groupCount: { color: color.textFaint, fontSize: 12 },
 
   row: {
     flexDirection: 'row',
@@ -1068,7 +1068,7 @@ const styles = StyleSheet.create({
   rowOn: { borderColor: color.accent, backgroundColor: color.rowHighlight },
   rowText: { flex: 1, gap: 2 },
   rowName: { color: color.text, fontSize: 14, fontWeight: '500' },
-  rowMeta: { color: color.textMuted, fontSize: 11.5 },
+  rowMeta: { color: color.textMuted, fontSize: 12 },
 
   draft: {
     borderWidth: 1,
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
   },
   fields: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   field: { flex: 1, gap: 4 },
-  fieldLabel: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.4 },
+  fieldLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   fieldInput: {
     borderWidth: 1,
     borderColor: color.border,
@@ -1095,8 +1095,8 @@ const styles = StyleSheet.create({
 
   weekGridLabel: {
     color: color.textFaint,
-    fontSize: 9.5,
-    letterSpacing: 1.4,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: space.sm,
   },
   weekList: { gap: space.sm, marginTop: 4 },
@@ -1105,17 +1105,17 @@ const styles = StyleSheet.create({
   weekCol: { flex: 1 },
   weekLoad: { flex: 1.6 },
   weekLabelBox: { width: 38, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  weekLabel: { color: color.textFaint, fontSize: 10.5 },
+  weekLabel: { color: color.textFaint, fontSize: 12 },
   weekHead: {
     flex: 1,
     color: color.textFaint,
-    fontSize: 9,
-    letterSpacing: 1.2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
-  backoffTag: { color: color.accent, fontSize: 9.5, letterSpacing: 0.5 },
-  addBackoff: { color: color.accent, fontSize: 11.5, paddingLeft: 44, paddingVertical: 2 },
-  weekError: { color: color.accent, fontSize: 11.5, paddingLeft: 44 },
+  backoffTag: { color: color.accent, fontSize: 12, letterSpacing: 0.6 },
+  addBackoff: { color: color.accent, fontSize: 12, paddingLeft: 44, paddingVertical: 2 },
+  weekError: { color: color.accent, fontSize: 12, paddingLeft: 44 },
   weekInput: {
     borderWidth: 1,
     borderColor: color.border,
@@ -1145,7 +1145,7 @@ const styles = StyleSheet.create({
   blockerItem: { color: color.accent, fontSize: 12.5, lineHeight: 18 },
   blockerHelp: {
     color: color.textFaint,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 16,
     marginTop: 2,
   },

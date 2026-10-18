@@ -101,12 +101,12 @@ export function GenerateSessionSheet({
         </View>
 
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.label}>MESOCICLO</Text>
+          <Text style={styles.label}>Bloque</Text>
           {mesos.loading && mesos.data === null ? (
             <ActivityIndicator color={color.accent} />
           ) : list.length === 0 ? (
             <Text style={styles.help}>
-              No tenés bloques activos. Creá uno en la pestaña Mesos.
+              No tienes bloques activos. Crea uno en la pestaña Bloques.
             </Text>
           ) : (
             <View style={styles.chips}>
@@ -127,7 +127,7 @@ export function GenerateSessionSheet({
             </View>
           )}
 
-          <Text style={styles.label}>SEMANA</Text>
+          <Text style={styles.label}>Semana</Text>
           <TextInput
             style={styles.input}
             value={week}
@@ -141,7 +141,7 @@ export function GenerateSessionSheet({
             </Text>
           ) : null}
 
-          <Text style={styles.label}>DÍA</Text>
+          <Text style={styles.label}>Día</Text>
           {chosen !== null ? (
             <View style={styles.chips}>
               {Array.from({ length: chosen.daysPerWeek }, (_, i) => i + 1).map((n) => (
@@ -154,7 +154,7 @@ export function GenerateSessionSheet({
               ))}
             </View>
           ) : (
-            <Text style={styles.help}>Elige primero el mesociclo.</Text>
+            <Text style={styles.help}>Elige primero el bloque.</Text>
           )}
           <Text style={styles.help}>
             Si ese día ya tiene una sesión abierta esa semana, se abre la misma.
@@ -205,8 +205,8 @@ const styles = StyleSheet.create({
   title: { color: color.text, fontSize: 16, fontWeight: '600', letterSpacing: 2.6 },
   subtitle: { color: color.textMuted, fontSize: 12.5, marginTop: 2 },
   body: { padding: space.lg, paddingTop: space.sm, gap: space.sm },
-  label: { color: color.textMuted, fontSize: 10, letterSpacing: 2, marginTop: space.sm },
-  help: { color: color.textFaint, fontSize: 11.5, lineHeight: 16 },
+  label: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2, marginTop: space.sm },
+  help: { color: color.textFaint, fontSize: 12, lineHeight: 16 },
   error: { color: color.accent, fontSize: 12.5, lineHeight: 18 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   input: {

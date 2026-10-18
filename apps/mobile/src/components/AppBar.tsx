@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { color, space } from '@/theme/tokens';
+import { color, palette, space } from '@/theme/tokens';
 
 /**
  * Barra de marca: el tick rojo, "The Cage · Barbell Club" y el rol a la
@@ -29,8 +29,8 @@ const styles = StyleSheet.create({
     borderBottomColor: color.border,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flex: 1 },
-  tick: { width: 3, height: 16, backgroundColor: '#c2231b' },
+  tick: { width: 3, height: 16, backgroundColor: palette.accentEdge },
   name: { color: color.text, fontSize: 14, fontWeight: '700', letterSpacing: 3.2 },
-  club: { color: color.textFaint, fontSize: 8.5, letterSpacing: 1.7 },
-  role: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.5, textTransform: 'uppercase' },
+  club: { color: color.textFaint, fontSize: 12, letterSpacing: 1.2 },
+  role: { color: color.textFaint, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' },
 });

@@ -25,6 +25,8 @@ export const palette = {
   n300: '#dcd8cd',
   n400: '#b9b5a9',
   n500: '#8d8a80',
+  /** Gris tenue: 4.5:1 sobre negro, sobre raised y sobre sunken. */
+  n550: '#84817a',
   n600: '#6b6862',
   n700: '#4c4a45',
   n800: '#2e2e2b',
@@ -41,7 +43,7 @@ export const color = {
   borderActive: palette.accent,
   text: palette.n200,
   textMuted: palette.n500,
-  textFaint: palette.n600,
+  textFaint: palette.n550,
   accent: palette.accent,
   accentDim: palette.a700,
   onAccent: palette.a100,

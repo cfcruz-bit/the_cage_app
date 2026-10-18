@@ -122,7 +122,7 @@ export function CredentialsSheet({
           ]}
         >
           <View style={styles.header}>
-            <Text style={styles.eyebrow}>ENTRAR COMO</Text>
+            <Text style={styles.eyebrow}>Entrar como</Text>
             <Text style={styles.title}>{ROLE_TITLE[role]}</Text>
           </View>
 
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   header: { gap: 2, marginBottom: space.xs },
-  eyebrow: { color: color.textFaint, fontSize: 10, letterSpacing: 2.2 },
+  eyebrow: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   title: { color: color.text, fontSize: 22, fontWeight: '600', letterSpacing: 3 },
   input: {
     borderWidth: 1,

@@ -74,13 +74,13 @@ function CoachList({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <Screen
-      title="MESOCICLOS"
+      title="BLOQUES"
       subtitle={list.length === 0 ? undefined : `${list.length} bloques`}
       trailing={
         <Pressable
           onPress={() => setCreating(true)}
           accessibilityRole="button"
-          accessibilityLabel="Nuevo mesociclo"
+          accessibilityLabel="Nuevo bloque"
           style={({ pressed }) => [styles.add, pressed && { opacity: 0.6 }]}
         >
           <Ionicons name="add" size={18} color={color.accent} />
@@ -109,8 +109,8 @@ function CoachList({ onOpen }: { onOpen: (id: string) => void }) {
 
         {mesos.data !== null && list.length === 0 ? (
           <Empty
-            title="Ningún mesociclo todavía"
-            body="Creá el primero con el + de arriba. Vas a necesitar al menos un atleta en tu cartera."
+            title="Ningún bloque todavía"
+            body="Crea el primero con el + de arriba. Necesitas al menos un atleta en tu cartera."
           />
         ) : null}
 
@@ -161,19 +161,19 @@ function AthleteMeso() {
 
   if (mesos.loading && mesos.data === null) {
     return (
-      <Screen title="MESOCICLO">
+      <Screen title="BLOQUE">
         <Loading />
       </Screen>
     );
   }
   if (active === undefined) {
     return (
-      <Screen title="MESOCICLO">
+      <Screen title="BLOQUE">
         {mesos.data === null ? (
           <Failure message={mesos.error} offline={mesos.offline} onRetry={mesos.reload} />
         ) : (
           <Empty
-            title="Sin mesociclo asignado"
+            title="Sin bloque asignado"
             body="Tu coach todavía no te programó un bloque."
           />
         )}
@@ -284,7 +284,7 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
 
   if (meso === null) {
     return (
-      <Screen title="MESOCICLO" leading={back}>
+      <Screen title="BLOQUE" leading={back}>
         {remote.loading ? (
           <Loading />
         ) : (
@@ -327,7 +327,7 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
                 style={[styles.tab, tab === t && styles.tabOn]}
               >
                 <Text style={[styles.tabText, tab === t && styles.tabTextOn]}>
-                  {t === 'plan' ? 'PAUTAR' : 'PREVISIÓN'}
+                  {t === 'plan' ? 'Pautar' : 'Previsión'}
                 </Text>
               </Pressable>
             ))}
@@ -340,7 +340,7 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
           <>
         <VolumeChart weeks={weeklyVolume} currentIndex={current} />
 
-        <Text style={styles.sectionLabel}>PROGRESIÓN POR EJERCICIO</Text>
+        <Text style={styles.sectionLabel}>Progresión por ejercicio</Text>
 
         {projections.map(({ id, name, muscle, weeks }) => (
           <View key={id} style={styles.card}>
@@ -349,8 +349,8 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
 
             {weeks.length === 0 ? (
               <Text style={styles.footnote}>
-                Sin peso de arranque todavía: registrá uno para ver la
-                previsión acá. La tabla autorizada (con % resueltos) es
+                Sin peso de arranque todavía: registra uno para ver la
+                previsión aquí. La tabla autorizada (con % resueltos) es
                 PAUTAR.
               </Text>
             ) : (
@@ -391,8 +391,8 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
 
         <Text style={styles.footnote}>
           {onBack === null
-            ? 'Tu coach programa este mesociclo. El motor ajusta la carga con el RIR y el feedback que reportes cada día.'
-            : 'Previsión del motor con feedback neutro. Para fijar números a mano, usá PAUTAR.'}
+            ? 'Tu coach programa este bloque. El motor ajusta la carga con el RIR y el feedback que reportes cada día.'
+            : 'Previsión del motor con feedback neutro. Para fijar números a mano, usa Pautar.'}
         </Text>
           </>
         )}
@@ -496,13 +496,13 @@ const styles = StyleSheet.create({
     borderBottomColor: color.border,
   },
   tabOn: { borderBottomColor: color.accent },
-  tabText: { color: color.textMuted, fontSize: 10.5, letterSpacing: 2 },
+  tabText: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2 },
   tabTextOn: { color: color.text, fontWeight: '600' },
 
   sectionLabel: {
     color: color.textMuted,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: space.sm,
   },
   card: {
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     borderColor: color.border,
   },
   name: { color: color.text, fontSize: 14.5, fontWeight: '600' },
-  muscle: { color: color.textMuted, fontSize: 11.5, marginTop: 1 },
+  muscle: { color: color.textMuted, fontSize: 12, marginTop: 1 },
 
   tableHead: {
     flexDirection: 'row',
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.border,
   },
-  headText: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.3 },
+  headText: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   row: { flexDirection: 'row', paddingVertical: 7 },
   rowNow: { backgroundColor: color.rowHighlight },
   rowDeload: { opacity: 0.55 },
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
 
   footnote: {
     color: color.textFaint,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 17,
     marginTop: space.sm,
   },

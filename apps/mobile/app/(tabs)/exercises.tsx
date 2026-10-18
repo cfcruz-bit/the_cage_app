@@ -149,11 +149,11 @@ export default function ExercisesScreen() {
         }
         ListEmptyComponent={
           <Text style={styles.empty}>
-            Ningún ejercicio coincide. Probá con otro filtro o borrá la búsqueda.
+            Ningún ejercicio coincide. Prueba con otro filtro o borra la búsqueda.
           </Text>
         }
         renderSectionHeader={({ section }) => (
-          <Text style={styles.sectionTitle}>{section.title.toUpperCase()}</Text>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
         )}
         renderItem={({ item }) => (
           <View style={styles.row}>
@@ -167,7 +167,7 @@ export default function ExercisesScreen() {
               <Text style={styles.specValue}>
                 {item.repLo}–{item.repHi}
               </Text>
-              <Text style={styles.specLabel}>REPS</Text>
+              <Text style={styles.specLabel}>Reps</Text>
             </View>
             <View style={styles.spec}>
               <Text style={styles.specValue}>{item.targetRir}</Text>
@@ -197,8 +197,8 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.sm },
   sectionTitle: {
     color: color.accent,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: space.md,
     marginBottom: 2,
   },
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   name: { color: color.text, fontSize: 15, fontWeight: '500' },
   meta: { color: color.textMuted, fontSize: 12 },
   spec: { alignItems: 'flex-end', gap: 2, minWidth: 40 },
-  specLabel: { color: color.textFaint, fontSize: 9, letterSpacing: 1.6, fontWeight: '600' },
+  specLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2, fontWeight: '600' },
   specValue: {
     color: color.text,
     fontSize: 14,

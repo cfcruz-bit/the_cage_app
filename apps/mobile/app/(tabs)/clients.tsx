@@ -62,7 +62,7 @@ function mesoLine(
   week: number | null,
   total: number | null,
 ): string {
-  if (name === null) return 'Sin mesociclo activo';
+  if (name === null) return 'Sin bloque activo';
   if (week === null || total === null) return name;
   return `${name} · Sem ${week} de ${total}`;
 }
@@ -99,17 +99,17 @@ function ClientList({ onOpen }: { onOpen: (id: string) => void }) {
 
   const stats = [
     {
-      label: 'ADHERENCIA',
+      label: 'Adherencia',
       value: overview.data === null ? '—' : adherenceOf(list),
       accent: false,
     },
     {
-      label: 'SESIONES/SEM',
+      label: 'Sesiones en 7 días',
       value: overview.data === null ? '—' : String(overview.data.sessionsLast7Days),
       accent: false,
     },
     {
-      label: 'ALERTAS',
+      label: 'Alertas abiertas',
       value: overview.data === null ? '—' : String(overview.data.openAlerts),
       accent: (overview.data?.openAlerts ?? 0) > 0,
     },
@@ -191,7 +191,7 @@ function ClientList({ onOpen }: { onOpen: (id: string) => void }) {
                 <Text style={styles.adherenceValue}>
                   {c.adherence === null ? '—' : `${c.adherence}%`}
                 </Text>
-                <Text style={styles.adherenceLabel}>ADHER.</Text>
+                <Text style={styles.adherenceLabel}>adherencia</Text>
               </View>
             </Pressable>
           );
@@ -271,7 +271,7 @@ function ClientDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <View style={styles.alertHead}>
               <Ionicons name="checkmark-circle" size={12} color={palette.n400} />
               <Text style={[styles.alertLabel, { color: palette.n400 }]}>
-                NADA QUE REVISAR
+                Nada que revisar
               </Text>
             </View>
             <Text style={styles.alertText}>
@@ -302,7 +302,7 @@ function ClientDetail({ id, onBack }: { id: string; onBack: () => void }) {
                       },
                     ]}
                   >
-                    <Text style={styles.weekLabel}>SEM</Text>
+                    <Text style={styles.weekLabel}>Sem</Text>
                     <Text
                       style={[
                         styles.weekN,
@@ -327,12 +327,12 @@ function ClientDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
         <RecordsPanel athleteId={id} canEdit />
 
-        <Text style={styles.sectionLabel}>ÚLTIMAS SESIONES</Text>
+        <Text style={styles.sectionLabel}>Últimas sesiones</Text>
 
         {c.sessions.length === 0 ? (
           <Empty
             title="Sin sesiones todavía"
-            body="Genera la primera desde el plan del mesociclo."
+            body="Genera la primera desde el plan del bloque."
           />
         ) : null}
 
@@ -389,7 +389,7 @@ function AlertCard({ alert }: { alert: AlertOut }) {
         <Text
           style={[styles.alertLabel, !warning && { color: palette.n400 }]}
         >
-          {warning ? 'REQUIERE TU REVISIÓN' : 'PARA TU INFORMACIÓN'}
+          {warning ? 'Requiere tu revisión' : 'Para tu información'}
         </Text>
       </View>
       <Text style={styles.alertText}>{alert.text}</Text>
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  statLabel: { color: color.textMuted, fontSize: 9.5, letterSpacing: 1.7 },
+  statLabel: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2 },
   statValue: {
     color: color.text,
     fontSize: 23,
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   rowTitle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name: { color: color.text, fontSize: 14, fontWeight: '500' },
-  meso: { color: color.textMuted, fontSize: 11.5 },
+  meso: { color: color.textMuted, fontSize: 12 },
   track: {
     height: 4,
     borderRadius: 2,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   fill: { height: '100%', borderRadius: 2 },
   adherence: { alignItems: 'flex-end' },
   adherenceValue: { color: color.text, fontSize: 15, fontWeight: '600' },
-  adherenceLabel: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.5 },
+  adherenceLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
 
   back: { padding: 4 },
 
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   alertHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  alertLabel: { color: palette.a300, fontSize: 10, letterSpacing: 2 },
+  alertLabel: { color: palette.a300, fontSize: 12, letterSpacing: 0.2 },
   alertText: { color: palette.n200, fontSize: 13, lineHeight: 19 },
   alertSuggestion: { color: color.textMuted, fontSize: 12.5, lineHeight: 18 },
   alertActions: { flexDirection: 'row', gap: space.sm, marginTop: 5 },
@@ -570,14 +570,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  weekLabel: { color: color.textMuted, fontSize: 9, letterSpacing: 1.4 },
+  weekLabel: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2 },
   weekN: { fontSize: 15, fontWeight: '600' },
-  weekState: { color: color.textFaint, fontSize: 9, marginTop: 1 },
+  weekState: { color: color.textFaint, fontSize: 12, marginTop: 1 },
 
   sectionLabel: {
     color: color.textMuted,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginTop: space.sm,
     marginBottom: 2,
   },
@@ -593,12 +593,12 @@ const styles = StyleSheet.create({
     borderColor: color.border,
   },
   sessionDate: { width: 34, alignItems: 'center' },
-  sessionDow: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.5 },
+  sessionDow: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   sessionDay: { color: color.text, fontSize: 15, fontWeight: '600' },
   divider: { width: 1, height: 30, backgroundColor: palette.n800 },
   sessionText: { flex: 1, gap: 2 },
   sessionName: { color: color.text, fontSize: 13, fontWeight: '500' },
-  sessionMeta: { color: color.textMuted, fontSize: 11 },
+  sessionMeta: { color: color.textMuted, fontSize: 12 },
   pill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 2 },
-  pillText: { fontSize: 11 },
+  pillText: { fontSize: 12 },
 });

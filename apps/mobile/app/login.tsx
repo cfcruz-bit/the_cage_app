@@ -46,7 +46,7 @@ const ROLES: RoleOption[] = [
   {
     key: 'athlete',
     title: 'ATLETA',
-    desc: 'Ejecuta tu meso y registra cada set',
+    desc: 'Entrena tu bloque y registra cada set',
     icon: 'barbell',
     edge: '#c2231b',
     surface: 'transparent',
@@ -55,7 +55,7 @@ const ROLES: RoleOption[] = [
   {
     key: 'coach',
     title: 'COACH',
-    desc: 'Programa mesos y revisa a tus clientes',
+    desc: 'Programa bloques y revisa a tus clientes',
     icon: 'people',
     edge: palette.n700,
     surface: palette.raised,
@@ -110,7 +110,7 @@ export default function LoginScreen() {
 
       <View style={styles.picker}>
         <Reveal kind="fade" delay={660}>
-          <Text style={styles.eyebrow}>ENTRAR COMO</Text>
+          <Text style={styles.eyebrow}>Entrar como</Text>
         </Reveal>
 
         {ROLES.map((r) => (
@@ -224,8 +224,8 @@ const styles = StyleSheet.create({
   picker: { flex: 0, paddingBottom: 64, gap: 9 },
   eyebrow: {
     color: color.textFaint,
-    fontSize: 10,
-    letterSpacing: 2.2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     marginBottom: 9,
   },
   card: {
@@ -248,10 +248,10 @@ const styles = StyleSheet.create({
   },
   cardText: { flex: 1, gap: 2 },
   cardTitle: { color: color.text, fontSize: 16, fontWeight: '600', letterSpacing: 3 },
-  cardDesc: { color: color.textMuted, fontSize: 11.5, lineHeight: 16 },
+  cardDesc: { color: color.textMuted, fontSize: 12, lineHeight: 16 },
   footnote: {
     color: color.textFaint,
-    fontSize: 11,
+    fontSize: 12,
     textAlign: 'center',
     marginTop: 14,
   },

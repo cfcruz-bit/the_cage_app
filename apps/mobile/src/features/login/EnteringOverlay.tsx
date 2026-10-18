@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
   },
   club: {
     color: palette.a100,
-    fontSize: 10.5,
-    letterSpacing: 3,
+    fontSize: 12,
+    letterSpacing: 0.6,
     marginTop: 4,
     opacity: 0.72,
   },

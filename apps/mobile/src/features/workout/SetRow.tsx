@@ -89,7 +89,7 @@ export const SetRow = memo(function SetRow({
               {formatNumber(loggedWeightKg, unit)} {unit} × {loggedRepsN ?? '—'}
             </Text>
           ) : (
-            <Text style={styles.noTarget}>— registrá tu peso</Text>
+            <Text style={styles.noTarget}>— registra tu peso</Text>
           )}
         </View>
 
@@ -99,20 +99,18 @@ export const SetRow = memo(function SetRow({
               onPress={onReport}
               accessibilityRole="button"
               accessibilityLabel={`Corregir el set ${index + 1}`}
-              hitSlop={8}
               style={({ pressed }) => [styles.report, pressed && styles.pressed]}
             >
-              <Ionicons name="create-outline" size={15} color={color.textFaint} />
+              <Text style={styles.reportText}>Corregir</Text>
             </Pressable>
           ) : (
             <Pressable
               onPress={onReport}
               accessibilityRole="button"
               accessibilityLabel={`No pude con el set ${index + 1}`}
-              hitSlop={8}
               style={({ pressed }) => [styles.report, pressed && styles.pressed]}
             >
-              <Text style={styles.reportText}>no pude</Text>
+              <Text style={styles.reportText}>No pude</Text>
             </Pressable>
           )
         ) : null}
@@ -165,13 +163,13 @@ const styles = StyleSheet.create({
   rowNext: { backgroundColor: color.rowHighlight },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   indexBox: { width: 14 },
-  indexBoxTagged: { width: 26 },
+  indexBoxTagged: { width: 32 },
   index: {
     color: color.textFaint,
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
-  kind: { color: color.accent, fontSize: 8, letterSpacing: 0.6 },
+  kind: { color: color.accent, fontSize: 12, letterSpacing: 0.6 },
   target: { flex: 1, gap: 2 },
   prescription: {
     color: color.text,
@@ -182,11 +180,20 @@ const styles = StyleSheet.create({
   prescriptionDone: { color: color.textMuted },
   noTarget: { color: color.textFaint, fontSize: 15, fontStyle: 'italic' },
   actual: { color: palette.a300, fontSize: 12, fontVariant: ['tabular-nums'] },
-  report: { paddingHorizontal: 4, paddingVertical: 4 },
-  reportText: { color: color.textFaint, fontSize: 11.5 },
+  report: {
+    minHeight: 48,
+    minWidth: 48,
+    paddingHorizontal: space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.chip,
+  },
+  reportText: { color: color.text, fontSize: 13 },
   check: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: radius.chip,
     borderWidth: 1,
     alignItems: 'center',
@@ -196,5 +203,5 @@ const styles = StyleSheet.create({
   checkPending: { backgroundColor: 'transparent', borderColor: color.border },
   pressed: { opacity: 0.6 },
   why: { color: color.textMuted, fontSize: 12, marginLeft: 26 },
-  deviatedNote: { color: color.textFaint, fontSize: 11, marginLeft: 26 },
+  deviatedNote: { color: color.textFaint, fontSize: 12, marginLeft: 26 },
 });

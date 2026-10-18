@@ -217,8 +217,8 @@ const styles = StyleSheet.create({
   },
   previewLabel: {
     color: color.textFaint,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 12,
+    letterSpacing: 0.2,
     fontWeight: '600',
   },
   previewText: { color: color.text, fontSize: 13, lineHeight: 19 },

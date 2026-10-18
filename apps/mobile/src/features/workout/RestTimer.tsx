@@ -30,22 +30,23 @@ const SOUND = 'descanso.wav';
 // Android fija el sonido de un canal al crearlo y no deja cambiarlo: tono
 // nuevo = canal nuevo. El viejo ('rest') se borra para que no quede en Ajustes.
 const CHANNEL = 'rest-alarm';
-const ready = (async () => {
-  if (Platform.OS === 'android') {
-    await Notifications.deleteNotificationChannelAsync('rest').catch(() => {});
-    await Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: 'Descanso entre series',
-      importance: Notifications.AndroidImportance.MAX,
-      sound: SOUND,
-      vibrationPattern: [0, 400, 200, 400, 200, 400],
-    });
-  }
-  const { granted } = await Notifications.requestPermissionsAsync();
-  return granted;
-})().catch(() => false);
+const channelReady = (async () => {
+  if (Platform.OS !== 'android') return;
+  await Notifications.deleteNotificationChannelAsync('rest').catch(() => {});
+  await Notifications.setNotificationChannelAsync(CHANNEL, {
+    name: 'Descanso entre series',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: SOUND,
+    vibrationPattern: [0, 400, 200, 400, 200, 400],
+  });
+})().catch(() => {});
 
+/** Agenda la alarma solo si ya hay permiso: pedirlo es cosa del botón. */
 async function scheduleAlarm(seconds: number) {
-  if (seconds <= 0 || !(await ready)) return null;
+  if (seconds <= 0) return null;
+  await channelReady;
+  const { granted } = await Notifications.getPermissionsAsync();
+  if (!granted) return null;
   return Notifications.scheduleNotificationAsync({
     content: { title: 'Descanso completo', body: 'A la siguiente serie.', sound: SOUND },
     trigger: {
@@ -69,6 +70,25 @@ interface Props {
 export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
   const [left, setLeft] = useState(seconds);
   const progress = useRef(new Animated.Value(1)).current;
+  const endsAt = useRef(0);
+  const alarm = useRef<Promise<string | null> | null>(null);
+
+  // El permiso se pide aquí y no al abrir la app: en el primer descanso el
+  // atleta entiende para qué sirve. Solo se ofrece mientras nunca se haya
+  // contestado; si dijo que no, no se insiste.
+  const [askNotify, setAskNotify] = useState(false);
+  useEffect(() => {
+    Notifications.getPermissionsAsync()
+      .then((p) => setAskNotify(p.status === 'undetermined' && p.canAskAgain))
+      .catch(() => {});
+  }, []);
+
+  async function enableNotify() {
+    setAskNotify(false);
+    const { granted } = await Notifications.requestPermissionsAsync();
+    const remaining = Math.round((endsAt.current - Date.now()) / 1000);
+    if (granted) alarm.current = scheduleAlarm(remaining);
+  }
 
   useEffect(() => {
     if (runKey == null) return;
@@ -84,6 +104,7 @@ export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
     // Contamos contra el reloj, no sumando ticks: si el sistema retrasa el
     // intervalo, el número sigue siendo el correcto.
     const startedAt = Date.now();
+    endsAt.current = startedAt + seconds * 1000;
     const id = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       const remaining = seconds - elapsed;
@@ -93,12 +114,12 @@ export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
 
     // Saltar, marcar otro set o salir de la pantalla desmonta el efecto y
     // cancela la alarma pendiente.
-    const alarm = scheduleAlarm(seconds);
+    alarm.current = scheduleAlarm(seconds);
 
     return () => {
       clearInterval(id);
-      alarm
-        .then((n) => (n ? Notifications.cancelScheduledNotificationAsync(n) : undefined))
+      alarm.current
+        ?.then((n) => (n ? Notifications.cancelScheduledNotificationAsync(n) : undefined))
         .catch(() => {});
     };
   }, [runKey, seconds, progress]);
@@ -126,6 +147,20 @@ export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
           ]}
         />
       </View>
+      {askNotify && !done ? (
+        <View style={styles.notify}>
+          <Text style={styles.notifyText}>
+            Activa los avisos y sonará al acabar el descanso aunque bloquees el teléfono.
+          </Text>
+          <Pressable
+            onPress={() => void enableNotify()}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.notifyButton, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.notifyButtonText}>Activar</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {children}
       <Pressable
         onPress={onDismiss}
@@ -161,6 +196,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: 6, backgroundColor: color.bone },
+  notify: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.sm,
+    borderRadius: radius.chip,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  notifyText: { flex: 1, color: color.bone, fontSize: 13, lineHeight: 18 },
+  notifyButton: {
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    borderRadius: radius.chip,
+    backgroundColor: color.bone,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifyButtonText: { color: color.onBone, fontSize: 14, fontWeight: '600' },
   skip: {
     backgroundColor: color.bone,
     alignItems: 'center',

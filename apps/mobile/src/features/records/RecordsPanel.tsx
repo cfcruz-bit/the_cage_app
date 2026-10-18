@@ -77,7 +77,7 @@ export function RecordsPanel({
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
-        <Text style={styles.sectionLabel}>MARCAS (1RM)</Text>
+        <Text style={styles.sectionLabel}>Marcas (1RM)</Text>
         {canEdit ? (
           <Pressable
             onPress={() => setAdding(true)}
@@ -172,11 +172,11 @@ function AddRecordSheet({
     if (exerciseId === null || busy) return;
     const value = Number(kg.trim().replace(',', '.'));
     if (!Number.isFinite(value) || value <= 0) {
-      setError('Escribí un peso válido.');
+      setError('Escribe un peso válido.');
       return;
     }
     if (achievedOn.trim().length === 0) {
-      setError('Escribí la fecha del test (AAAA-MM-DD).');
+      setError('Escribe la fecha del test (AAAA-MM-DD).');
       return;
     }
 
@@ -212,7 +212,7 @@ function AddRecordSheet({
 
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
           <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>EJERCICIO</Text>
+            <Text style={styles.fieldLabel}>Ejercicio</Text>
             <Pressable onPress={() => setOnlyBasicos((v) => !v)} hitSlop={6}>
               <Text style={styles.toggle}>
                 {onlyBasicos ? 'Ver todos' : 'Solo básicos'}
@@ -226,7 +226,7 @@ function AddRecordSheet({
 
           {grouped.map((g) => (
             <View key={g.muscle} style={styles.group}>
-              <Text style={styles.groupTitle}>{g.label.toUpperCase()}</Text>
+              <Text style={styles.groupTitle}>{g.label}</Text>
               <View style={styles.chips}>
                 {g.items.map((item) => (
                   <Pressable
@@ -247,7 +247,7 @@ function AddRecordSheet({
             </View>
           ))}
 
-          <Text style={styles.fieldLabel}>KILOS</Text>
+          <Text style={styles.fieldLabel}>Kilos</Text>
           <TextInput
             style={styles.input}
             value={kg}
@@ -258,7 +258,7 @@ function AddRecordSheet({
             accessibilityLabel="Kilos de la marca"
           />
 
-          <Text style={styles.fieldLabel}>FECHA DEL TEST (AAAA-MM-DD)</Text>
+          <Text style={styles.fieldLabel}>Fecha del test (AAAA-MM-DD)</Text>
           <TextInput
             style={styles.input}
             value={achievedOn}
@@ -269,7 +269,7 @@ function AddRecordSheet({
             accessibilityLabel="Fecha del test"
           />
 
-          <Text style={styles.fieldLabel}>ORIGEN</Text>
+          <Text style={styles.fieldLabel}>Origen</Text>
           <View style={styles.chips}>
             {(Object.keys(SOURCE_LABEL) as OneRepMaxSource[]).map((s) => (
               <Pressable
@@ -325,7 +325,7 @@ function AddRecordSheet({
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionLabel: { color: color.textMuted, fontSize: 10, letterSpacing: 2 },
+  sectionLabel: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2 },
   empty: { color: color.textFaint, fontSize: 12.5 },
 
   row: {
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 2 },
   name: { color: color.text, fontSize: 13.5, fontWeight: '500' },
-  meta: { color: color.textMuted, fontSize: 11 },
+  meta: { color: color.textMuted, fontSize: 12 },
   value: {
     color: color.text,
     fontSize: 16,
@@ -381,11 +381,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: space.sm,
   },
-  fieldLabel: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.4, marginTop: space.sm },
-  toggle: { color: color.accent, fontSize: 11.5 },
+  fieldLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2, marginTop: space.sm },
+  toggle: { color: color.accent, fontSize: 12 },
 
   group: { gap: 5, marginTop: 4 },
-  groupTitle: { color: color.accent, fontSize: 9.5, letterSpacing: 1.6 },
+  groupTitle: { color: color.accent, fontSize: 12, letterSpacing: 0.2 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     paddingHorizontal: 10,

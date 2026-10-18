@@ -24,7 +24,7 @@ export function VolumeChart({ weeks, currentIndex }: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>VOLUMEN SEMANAL · HARD SETS POR MÚSCULO</Text>
+      <Text style={styles.label}>Volumen semanal: hard sets por músculo</Text>
 
       <View style={styles.plot}>
         {weeks.map((v, i) => {
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  label: { color: color.textMuted, fontSize: 10, letterSpacing: 2 },
+  label: { color: color.textMuted, fontSize: 12, letterSpacing: 0.2 },
   plot: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   column: { flex: 1, alignItems: 'center', gap: 6 },
   barSlot: { width: '100%', height: CHART_HEIGHT, justifyContent: 'flex-end' },
   bar: { width: '100%', borderRadius: 1 },
-  tick: { color: color.textFaint, fontSize: 9.5 },
+  tick: { color: color.textFaint, fontSize: 12 },
   tickNow: { color: palette.a200, fontWeight: '600' },
   legend: {
     flexDirection: 'row',
@@ -100,5 +100,5 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   swatch: { width: 8, height: 8, borderRadius: 2 },
-  legendText: { color: color.textMuted, fontSize: 11 },
+  legendText: { color: color.textMuted, fontSize: 12 },
 });

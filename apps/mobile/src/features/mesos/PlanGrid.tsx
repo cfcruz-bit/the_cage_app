@@ -102,7 +102,7 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
   if (grid.rows.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyBody}>Este mesociclo no tiene ejercicios.</Text>
+        <Text style={styles.emptyBody}>Este bloque no tiene ejercicios.</Text>
       </View>
     );
   }
@@ -110,7 +110,7 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.hint}>
-        Cada celda es lo que propone el motor. Tocá una para pautarla a mano; lo
+        Cada celda es lo que propone el motor. Toca una para pautarla a mano; lo
         que no toques lo sigue ajustando él con el feedback del atleta.
       </Text>
 
@@ -131,10 +131,10 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View>
               <View style={styles.head}>
-                <Text style={[styles.cell, styles.cellWeek, styles.headText]}>SEM</Text>
-                <Text style={[styles.cell, styles.headText]}>SETS</Text>
-                <Text style={[styles.cell, styles.cellWide, styles.headText]}>REPS</Text>
-                <Text style={[styles.cell, styles.cellWide, styles.headText]}>CARGA</Text>
+                <Text style={[styles.cell, styles.cellWeek, styles.headText]}>Sem</Text>
+                <Text style={[styles.cell, styles.headText]}>Sets</Text>
+                <Text style={[styles.cell, styles.cellWide, styles.headText]}>Reps</Text>
+                <Text style={[styles.cell, styles.cellWide, styles.headText]}>Carga</Text>
                 <Text style={[styles.cell, styles.headText]}>RIR</Text>
               </View>
 
@@ -368,12 +368,12 @@ function CellSheet({
 
         <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
           <Text style={styles.hint}>
-            Lo que dejes vacío lo decide el motor. Es como devolvés una celda a
+            Lo que dejes vacío lo decide el motor. Es como devuelves una celda a
             automático sin borrar el resto.
           </Text>
 
           <View style={styles.fields}>
-            <Field label="SETS" value={sets} onChange={setSets} auto={String(cell.sets)} />
+            <Field label="Sets" value={sets} onChange={setSets} auto={String(cell.sets)} />
             <Field
               label="CARGA (% o KG)"
               value={load}
@@ -384,25 +384,25 @@ function CellSheet({
           </View>
 
           <View style={styles.fields}>
-            <Field label="REPS MIN" value={repLo} onChange={setRepLo} auto={String(cell.repLo)} />
-            <Field label="REPS MAX" value={repHi} onChange={setRepHi} auto={String(cell.repHi)} />
-            <Field label="DESCANSO S" value={rest} onChange={setRest} auto="" />
+            <Field label="Reps mín." value={repLo} onChange={setRepLo} auto={String(cell.repLo)} />
+            <Field label="Reps máx." value={repHi} onChange={setRepHi} auto={String(cell.repHi)} />
+            <Field label="Descanso (s)" value={rest} onChange={setRest} auto="" />
           </View>
 
           <Text style={styles.hintFaint}>
-            El descanso siempre lo pautás vos: no tiene modo automático.
+            El descanso siempre lo pautas tú: no tiene modo automático.
           </Text>
 
           {isBasico ? (
             <>
-              <Text style={styles.fieldLabel}>BACK-OFF (opcional)</Text>
+              <Text style={styles.fieldLabel}>Back-off (opcional)</Text>
               <Text style={styles.hintFaint}>
                 Con back-off, sets, reps y carga de arriba son el TOP set. La carga del
                 back-off es fija: no depende de lo que salga el top.
               </Text>
               <View style={styles.fields}>
-                <Field label="SETS" value={bSets} onChange={setBSets} auto="—" />
-                <Field label="REPS" value={bReps} onChange={setBReps} auto="—" />
+                <Field label="Sets" value={bSets} onChange={setBSets} auto="—" />
+                <Field label="Reps" value={bReps} onChange={setBReps} auto="—" />
                 <Field label="CARGA (% o KG)" value={bLoad} onChange={setBLoad} auto="—" />
               </View>
             </>
@@ -495,12 +495,12 @@ function numberOrNull(text: string): number | null {
 const styles = StyleSheet.create({
   wrap: { gap: space.sm },
   dayGroup: { gap: space.sm, marginTop: space.sm },
-  dayHeading: { color: color.accent, fontSize: 10, letterSpacing: 2 },
+  dayHeading: { color: color.accent, fontSize: 12, letterSpacing: 0.2 },
   center: { alignItems: 'center', justifyContent: 'center', gap: space.sm, padding: space.xxl },
   emptyBody: { color: color.textMuted, fontSize: 12.5, textAlign: 'center' },
   link: { color: color.accent, fontSize: 13 },
-  hint: { color: color.textFaint, fontSize: 11.5, lineHeight: 17 },
-  hintFaint: { color: color.textFaint, fontSize: 11, lineHeight: 16 },
+  hint: { color: color.textFaint, fontSize: 12, lineHeight: 17 },
+  hintFaint: { color: color.textFaint, fontSize: 12, lineHeight: 16 },
   error: { color: color.accent, fontSize: 12.5, lineHeight: 18 },
 
   card: {
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     borderColor: color.border,
   },
   name: { color: color.text, fontSize: 14.5, fontWeight: '600' },
-  meta: { color: color.textMuted, fontSize: 11.5, marginTop: 1 },
+  meta: { color: color.textMuted, fontSize: 12, marginTop: 1 },
 
   head: {
     flexDirection: 'row',
@@ -520,15 +520,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: color.border,
   },
-  headText: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.3 },
+  headText: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   week: { paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center' },
   backoffLine: {
     paddingLeft: 44,
     paddingTop: 3,
     color: color.textMuted,
-    fontSize: 11,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    letterSpacing: 0.2,
     fontVariant: ['tabular-nums'],
   },
   rowNow: { backgroundColor: color.rowHighlight },
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
 
   fields: { flexDirection: 'row', gap: space.sm },
   field: { flex: 1, gap: 4 },
-  fieldLabel: { color: color.textFaint, fontSize: 9.5, letterSpacing: 1.4 },
+  fieldLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   fieldInput: {
     borderWidth: 1,
     borderColor: color.border,

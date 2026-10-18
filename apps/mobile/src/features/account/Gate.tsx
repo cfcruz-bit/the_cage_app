@@ -77,10 +77,10 @@ export function ChangePasswordGate() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Ionicons name="key-outline" size={30} color={color.accent} />
-        <Text style={styles.title}>ELEGÍ TU CONTRASEÑA</Text>
+        <Text style={styles.title}>ELIGE TU CONTRASEÑA</Text>
         <Text style={styles.help}>
-          La que te dieron es provisional. Elegí una tuya para seguir: a partir
-          de ahora solo la vas a saber vos.
+          La que te dieron es provisional. Elige una tuya para seguir: a partir
+          de ahora solo la sabrás tú.
         </Text>
 
         <TextInput
@@ -161,11 +161,11 @@ export function ExpiredGate({ endedOn }: { endedOn: string | null }) {
         <Text style={styles.title}>NECESITA RENOVAR SU PAGO</Text>
         <Text style={styles.help}>
           {endedOn === null
-            ? 'Tu acceso no está activo. Hablá con tu entrenador para renovarlo.'
-            : `Tu acceso terminó el ${formatDate(endedOn)}. Hablá con tu entrenador para renovarlo.`}
+            ? 'Tu acceso no está activo. Habla con tu entrenador para renovarlo.'
+            : `Tu acceso terminó el ${formatDate(endedOn)}. Habla con tu entrenador para renovarlo.`}
         </Text>
         <Text style={styles.helpFaint}>
-          Tu historial y tus mesociclos siguen guardados. En cuanto renueves,
+          Tu historial y tus bloques siguen guardados. En cuanto renueves,
           entrás donde lo dejaste.
         </Text>
 

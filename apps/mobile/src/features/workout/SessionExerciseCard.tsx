@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { SessionExerciseOut } from '@/api/types';
 import { SetRow } from './SetRow';
+import { muscleLabel } from '@/lib/muscles';
 import { formatRest } from '@/lib/prescription';
 import { type Unit, formatLoad } from '@/lib/units';
 import { color, palette, radius, space } from '@/theme/tokens';
@@ -61,7 +62,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={styles.muscle}>{exercise.muscle}</Text>
+          <Text style={styles.muscle}>{muscleLabel(exercise.muscle)}</Text>
           <Text style={styles.name}>{exercise.name}</Text>
         </View>
         <View style={[styles.badge, allDone && styles.badgeDone]}>
@@ -89,8 +90,6 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
       {/* La explicación del motor. Viaja desde el servidor tal cual: es lo que
           convierte un número en una decisión que el atleta entiende. */}
       <Text style={styles.why}>{exercise.why}</Text>
-
-      <SetTypes />
 
       {sets.map((s) => (
         <SetRow
@@ -138,77 +137,7 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   );
 });
 
-/**
- * Los tipos de serie del prototipo.
- *
- * Myorep y Myorep Match se enseñan **deshabilitados**, como estaban en el
- * original: el cliente los aprobó y saber que están en el plan importa. Pero
- * no hacen nada todavía, y un botón que parece activo y no responde es peor
- * que uno que se ve apagado.
- *
- * Implementarlos es trabajo real: el motor tiene que entender sub-series, la
- * base guardarlas y la pantalla contarlas mientras el atleta descansa quince
- * segundos entre mini-series.
- */
-function SetTypes() {
-  return (
-    <View style={styles.types}>
-      {SET_TYPES.map((t) => (
-        <View
-          key={t.mark}
-          style={[styles.type, !t.ready && styles.typeOff]}
-          accessible
-          accessibilityLabel={
-            t.ready ? t.label : `${t.label}, próximamente`
-          }
-        >
-          <Text style={[styles.typeMark, !t.ready && styles.typeTextOff]}>
-            {t.mark}
-          </Text>
-          <Text style={[styles.typeLabel, !t.ready && styles.typeTextOff]}>
-            {t.label}
-          </Text>
-        </View>
-      ))}
-      <Text style={styles.typeNote}>próximamente</Text>
-    </View>
-  );
-}
-
-const SET_TYPES = [
-  { mark: 'R', label: 'Regular', ready: true },
-  { mark: 'M', label: 'Myorep', ready: false },
-  { mark: 'MM', label: 'Myorep Match', ready: false },
-] as const;
-
 const styles = StyleSheet.create({
-  types: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: space.md,
-    paddingBottom: space.sm,
-  },
-  type: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: color.border,
-    borderRadius: radius.chip,
-  },
-  typeOff: { borderStyle: 'dashed', opacity: 0.55 },
-  typeMark: {
-    color: color.accent,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  typeLabel: { color: color.textMuted, fontSize: 11 },
-  typeTextOff: { color: color.textFaint },
-  typeNote: { color: color.textFaint, fontSize: 10, fontStyle: 'italic' },
   card: {
     backgroundColor: color.bgRaised,
     borderWidth: 1,
@@ -224,7 +153,7 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
   },
   headerText: { flex: 1, gap: 2 },
-  muscle: { color: color.textFaint, fontSize: 10, letterSpacing: 2, fontWeight: '600' },
+  muscle: { color: color.textMuted, fontSize: 12.5 },
   name: { color: color.text, fontSize: 16, fontWeight: '600' },
   badge: {
     paddingHorizontal: space.sm,
@@ -246,7 +175,7 @@ const styles = StyleSheet.create({
   target: { color: color.textMuted, fontSize: 12.5 },
   why: {
     color: color.textFaint,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 16,
     paddingHorizontal: space.md,
     paddingBottom: space.sm,
