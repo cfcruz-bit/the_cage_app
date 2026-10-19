@@ -140,6 +140,10 @@ async def main() -> None:
     async with httpx.AsyncClient(base_url=API, timeout=60) as c:
         admin = await login(c, admin_email, admin_password)
         r = await c.get("/admin/users", headers=admin)
+        if r.status_code == 403:
+            raise SystemExit(
+                f"{admin_email} entra, pero no es administrador. Usa la cuenta del panel /admin."
+            )
         r.raise_for_status()
         usuarios = r.json()
 
