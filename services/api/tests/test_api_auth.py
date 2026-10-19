@@ -46,6 +46,19 @@ async def adopt(client: AsyncClient, created: dict) -> str:
     return email
 
 
+async def link(
+    client: AsyncClient, admin: dict, coach_headers: dict, athlete_mail: str
+) -> None:
+    """Pone al atleta en la cartera del coach, como lo hace el administrador."""
+    coach = (await client.get("/api/v1/auth/me", headers=coach_headers)).json()
+    r = await client.post(
+        f"/api/v1/admin/coaches/{coach['id']}/athletes",
+        headers=admin["headers"],
+        json={"email": athlete_mail},
+    )
+    assert r.status_code == 201, r.text
+
+
 async def register(
     client: AsyncClient,
     admin: dict,

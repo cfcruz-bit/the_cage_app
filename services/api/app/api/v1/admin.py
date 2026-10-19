@@ -32,6 +32,7 @@ from app.api.dto import (
     CreateAthleteRequest,
     CreateCoachRequest,
     CreatedUserOut,
+    LinkAthleteRequest,
     MembershipOut,
     RenewRequest,
     UserOut,
@@ -130,6 +131,41 @@ async def create_athlete(
     await session.refresh(athlete)
 
     return CreatedUserOut(user=await describe(session, athlete), temporary_password=temporary)
+
+
+@router.post(
+    "/coaches/{coach_id}/athletes", response_model=UserOut, status_code=status.HTTP_201_CREATED
+)
+async def assign_athlete(
+    coach_id: uuid.UUID, body: LinkAthleteRequest, session: SessionDep, _admin: AdminUser
+) -> UserOut:
+    """Pone a un atleta que ya existe en la cartera de un coach.
+
+    Fuera del alta, es la unica forma de vincularlos. Antes lo hacia el propio
+    coach con solo saber el email, y eso le dejaba leer el historial de
+    cualquier atleta del gimnasio.
+    """
+    coach = await session.get(User, coach_id)
+    if coach is None or coach.role != UserRole.COACH:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No hay ningun coach con ese id"
+        )
+    found = await session.execute(select(User).where(User.email == body.email))
+    athlete = found.scalar_one_or_none()
+    if athlete is None or athlete.role != UserRole.ATHLETE:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No hay ningun atleta con ese email"
+        )
+
+    already = await session.execute(
+        select(CoachAthlete).where(
+            CoachAthlete.coach_id == coach.id, CoachAthlete.athlete_id == athlete.id
+        )
+    )
+    if already.scalar_one_or_none() is None:
+        session.add(CoachAthlete(coach_id=coach.id, athlete_id=athlete.id))
+        await session.commit()
+    return await describe(session, athlete)
 
 
 @router.post("/athletes/{athlete_id}/renew", response_model=UserOut)

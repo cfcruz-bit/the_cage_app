@@ -144,7 +144,7 @@ function ClientList({ onOpen }: { onOpen: (id: string) => void }) {
         {list.length === 0 ? (
           <Empty
             title="Todavía no llevas a nadie"
-            body="Añade atletas por su email desde la pantalla de ajustes. Tienen que tener cuenta creada."
+            body="Tus atletas aparecen aquí en cuanto el administrador te los asigna."
           />
         ) : null}
 

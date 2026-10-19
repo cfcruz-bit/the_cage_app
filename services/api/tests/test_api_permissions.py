@@ -16,7 +16,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from tests.test_api_auth import auth, login, register
+from tests.test_api_auth import auth, link, login, register
 
 
 async def _catalogo(client: AsyncClient, headers: dict[str, str]) -> str:
@@ -56,8 +56,7 @@ async def mundo(client: AsyncClient, admin: dict) -> Escenario:
 
     # Cada coach lleva a un atleta.
     for headers, mail in ((ca, atleta_a_mail), (cb, atleta_b_mail)):
-        r = await client.post("/api/v1/coach/athletes", headers=headers, json={"email": mail})
-        assert r.status_code == 201, r.text
+        await link(client, admin, headers, mail)
 
     catalog_id = await _catalogo(client, ca)
 
@@ -253,15 +252,37 @@ async def test_la_cartera_solo_muestra_los_propios(
 
 
 @pytest.mark.asyncio
-async def test_un_coach_no_se_anade_a_si_mismo(client: AsyncClient, mundo: Escenario) -> None:
-    me = await client.get("/api/v1/auth/me", headers=mundo.ca)
+async def test_un_coach_no_puede_vincular_atletas(
+    client: AsyncClient, mundo: Escenario
+) -> None:
+    """Antes, con el email bastaba para meter a cualquier atleta en la cartera."""
+    me = await client.get("/api/v1/auth/me", headers=mundo.ab)
     r = await client.post(
-        "/api/v1/coach/athletes",
-        headers=mundo.ca,
-        json={"email": me.json()["email"]},
+        "/api/v1/coach/athletes", headers=mundo.ca, json={"email": me.json()["email"]}
     )
-    # Es un coach, no un atleta: ni siquiera llega a la comprobacion de igualdad.
+    assert r.status_code == 405
+
+    r = await client.get(
+        f"/api/v1/coach/athletes/{mundo.atleta_b['id']}/summary", headers=mundo.ca
+    )
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_solo_el_admin_vincula(
+    client: AsyncClient, admin: dict, mundo: Escenario
+) -> None:
+    coach = (await client.get("/api/v1/auth/me", headers=mundo.ca)).json()
+    atleta = (await client.get("/api/v1/auth/me", headers=mundo.ab)).json()
+    url = f"/api/v1/admin/coaches/{coach['id']}/athletes"
+
+    r = await client.post(url, headers=mundo.ca, json={"email": atleta["email"]})
+    assert r.status_code == 403
+
+    r = await client.post(url, headers=admin["headers"], json={"email": atleta["email"]})
+    assert r.status_code == 201
+    r = await client.get("/api/v1/coach/athletes", headers=mundo.ca)
+    assert atleta["id"] in {u["id"] for u in r.json()}
 
 
 # ── Listado de mesociclos ────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from tests.test_api_auth import auth, login, register
+from tests.test_api_auth import auth, link, login, register
 
 
 @pytest_asyncio.fixture
@@ -22,7 +22,7 @@ async def mundo(client: AsyncClient, admin: dict) -> dict:
     coach_mail, _ = await register(client, admin, "coach")
     atleta_mail, atleta = await register(client, admin, "athlete")
     ca = auth(await login(client, coach_mail))
-    await client.post("/api/v1/coach/athletes", headers=ca, json={"email": atleta_mail})
+    await link(client, admin, ca, atleta_mail)
 
     cat = await client.post(
         "/api/v1/exercises",

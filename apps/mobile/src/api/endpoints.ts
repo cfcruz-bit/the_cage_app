@@ -223,13 +223,6 @@ export async function listAthletes(): Promise<UserOut[]> {
   return request<UserOut[]>('/coach/athletes');
 }
 
-export async function linkAthlete(email: string): Promise<UserOut> {
-  return request<UserOut>('/coach/athletes', {
-    method: 'POST',
-    body: { email },
-  });
-}
-
 export async function coachOverview(): Promise<CoachOverviewOut> {
   return request<CoachOverviewOut>('/coach/overview');
 }

@@ -19,12 +19,11 @@ from app.api.dto import (
     AthleteCardOut,
     AthleteSummaryOut,
     CoachOverviewOut,
-    LinkAthleteRequest,
     SessionSummaryOut,
     UserOut,
 )
 from app.domain.alerts import Alert, Severity
-from app.models import CoachAthlete, Mesocycle, TrainingSession, User, UserRole
+from app.models import CoachAthlete, Mesocycle, TrainingSession, User
 from app.services.analytics import (
     athlete_alerts,
     recent_sessions,
@@ -43,40 +42,6 @@ async def list_athletes(coach: CoachUser, session: SessionDep) -> list[User]:
         .order_by(User.display_name)
     )
     return list(found.scalars())
-
-
-@router.post("/athletes", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def link_athlete(body: LinkAthleteRequest, coach: CoachUser, session: SessionDep) -> User:
-    """Da de alta en la cartera a un atleta que YA tiene cuenta.
-
-    No crea la cuenta. Un coach no deberia poder fabricar usuarios con
-    contrasenas que el elige: el atleta se registra y luego se vincula.
-    """
-    found = await session.execute(select(User).where(User.email == body.email))
-    athlete = found.scalar_one_or_none()
-
-    if athlete is None or athlete.role != UserRole.ATHLETE:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No hay ningun atleta con ese email",
-        )
-    if athlete.id == coach.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No puedes anadirte a tu propia cartera",
-        )
-
-    already = await session.execute(
-        select(CoachAthlete).where(
-            CoachAthlete.coach_id == coach.id,
-            CoachAthlete.athlete_id == athlete.id,
-        )
-    )
-    if already.scalar_one_or_none() is None:
-        session.add(CoachAthlete(coach_id=coach.id, athlete_id=athlete.id))
-        await session.commit()
-
-    return athlete
 
 
 # ── Panel ────────────────────────────────────────────────────────────────────

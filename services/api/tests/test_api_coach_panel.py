@@ -13,7 +13,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from tests.test_api_auth import auth, login, register
+from tests.test_api_auth import auth, link, login, register
 
 
 @pytest_asyncio.fixture
@@ -22,7 +22,7 @@ async def gym(client: AsyncClient, admin: dict) -> dict:
     atleta_mail, atleta = await register(client, admin, "athlete")
     ca = auth(await login(client, coach_mail))
     aa = auth(await login(client, atleta_mail))
-    await client.post("/api/v1/coach/athletes", headers=ca, json={"email": atleta_mail})
+    await link(client, admin, ca, atleta_mail)
 
     cat = await client.post(
         "/api/v1/exercises",
@@ -273,7 +273,7 @@ async def test_un_atleta_sin_bloque_activo_no_rompe_la_lista(
     coach_mail, _ = await register(client, admin, "coach")
     atleta_mail, _ = await register(client, admin, "athlete")
     ca = auth(await login(client, coach_mail))
-    await client.post("/api/v1/coach/athletes", headers=ca, json={"email": atleta_mail})
+    await link(client, admin, ca, atleta_mail)
 
     r = await client.get("/api/v1/coach/athletes/summaries", headers=ca)
     assert r.status_code == 200

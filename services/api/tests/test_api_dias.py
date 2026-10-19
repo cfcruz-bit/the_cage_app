@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Membership
-from tests.test_api_auth import auth, login, register
+from tests.test_api_auth import auth, link, login, register
 
 API = "/api/v1"
 
@@ -59,7 +59,7 @@ def _ej(cat_id: str, dia: int | None = None) -> dict:
 async def _atleta(client: AsyncClient, admin: dict, ca: dict) -> tuple[dict, dict]:
     mail, atleta = await register(client, admin, "athlete")
     aa = auth(await login(client, mail))
-    await client.post(f"{API}/coach/athletes", headers=ca, json={"email": mail})
+    await link(client, admin, ca, mail)
     return aa, atleta
 
 
