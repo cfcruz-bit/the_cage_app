@@ -16,12 +16,24 @@ import type { Unit } from '@/lib/units';
 
 const DB_NAME = 'cage.db';
 
-let db: SQLite.SQLiteDatabase | null = null;
+/**
+ * Una sola conexion para toda la app, y nadie la usa antes de migrar.
+ *
+ * Se guarda la promesa y no la base: si dos pantallas piden la base a la vez
+ * al arrancar, antes cada una abria su propia conexion, y la segunda podia
+ * escribir con la primera a medio migrar.
+ */
+let db: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function openDb(): Promise<SQLite.SQLiteDatabase> {
-  if (db) return db;
-  db = await SQLite.openDatabaseAsync(DB_NAME);
-  await migrate(db);
+export function openDb(): Promise<SQLite.SQLiteDatabase> {
+  db ??= (async () => {
+    const database = await SQLite.openDatabaseAsync(DB_NAME);
+    await migrate(database);
+    return database;
+  })().catch((error: unknown) => {
+    db = null;
+    throw error;
+  });
   return db;
 }
 

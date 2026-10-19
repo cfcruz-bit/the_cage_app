@@ -129,6 +129,7 @@ export const useWorkout = create<WorkoutState>((set, get) => ({
       await cacheSession(session.id, session);
       set({ session, next: null, stale: false, marks: {}, feedbackDone: {} });
     } catch (error) {
+      console.error('[cage] no se pudo abrir el dia:', error);
       set({
         error:
           error instanceof ApiError

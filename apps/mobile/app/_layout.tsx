@@ -42,11 +42,17 @@ export default function RootLayout() {
   //
   // Un administrador no tiene sitio aquí: administra desde la página web. Si
   // entrara con su cuenta, la app lo trata como si no hubiera sesión.
+  //
+  // Depende de quién es y qué rol tiene, no del objeto `user`: refreshProfile
+  // guarda un objeto nuevo, y con `user` como dependencia se volvía a llamar a
+  // sí mismo en bucle (decenas de /auth/me seguidos al entrar).
+  const who = user === undefined ? undefined : user === null ? null : `${user.id}:${user.role}`;
   useEffect(() => {
-    if (user === undefined) return;
-    adopt(user === null || user.role === 'admin' ? null : user.role);
-    if (user !== null) void refreshProfile();
-  }, [user, adopt]);
+    const current = useAuth.getState().user;
+    if (current === undefined) return;
+    adopt(current === null || current.role === 'admin' ? null : current.role);
+    if (current !== null) void refreshProfile();
+  }, [who, adopt]);
 
   // La cola se vacía sola mientras haya sesión.
   useAutoSync(user != null);
