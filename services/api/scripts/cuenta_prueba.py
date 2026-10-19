@@ -142,7 +142,7 @@ async def main() -> None:
         r = await c.get("/admin/users", headers=admin)
         if r.status_code == 403:
             raise SystemExit(
-                f"{admin_email} entra, pero no es administrador. Usa la cuenta del panel /admin."
+                f"{admin_email} entra, pero no es administrador. Usa la del panel /admin."
             )
         r.raise_for_status()
         usuarios = r.json()
