@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -75,77 +76,79 @@ export function ChangePasswordGate() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <Ionicons name="key-outline" size={30} color={color.accent} />
-        <Text style={styles.title}>ELIGE TU CONTRASEÑA</Text>
-        <Text style={styles.help}>
-          La que te dieron es provisional. Elige una tuya para seguir: a partir
-          de ahora solo la sabrás tú.
-        </Text>
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+          <Ionicons name="key-outline" size={30} color={color.accent} />
+          <Text style={styles.title}>ELIGE TU CONTRASEÑA</Text>
+          <Text style={styles.help}>
+            La que te dieron es provisional. Elige una tuya para seguir: a partir
+            de ahora solo la sabrás tú.
+          </Text>
 
-        <TextInput
-          style={styles.input}
-          value={current}
-          onChangeText={setCurrent}
-          placeholder="Contraseña provisional"
-          placeholderTextColor={color.textFaint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          editable={!busy}
-          accessibilityLabel="Contraseña provisional"
-        />
-        <TextInput
-          style={styles.input}
-          value={next}
-          onChangeText={setNext}
-          placeholder={`Nueva contraseña (mínimo ${MIN_LENGTH})`}
-          placeholderTextColor={color.textFaint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          editable={!busy}
-          accessibilityLabel="Nueva contraseña"
-        />
-        <TextInput
-          style={styles.input}
-          value={repeat}
-          onChangeText={setRepeat}
-          placeholder="Repetir la nueva"
-          placeholderTextColor={color.textFaint}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          editable={!busy}
-          onSubmitEditing={() => void submit()}
-          accessibilityLabel="Repetir la nueva contraseña"
-        />
+          <TextInput
+            style={styles.input}
+            value={current}
+            onChangeText={setCurrent}
+            placeholder="Contraseña provisional"
+            placeholderTextColor={color.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            editable={!busy}
+            accessibilityLabel="Contraseña provisional"
+          />
+          <TextInput
+            style={styles.input}
+            value={next}
+            onChangeText={setNext}
+            placeholder={`Nueva contraseña (mínimo ${MIN_LENGTH})`}
+            placeholderTextColor={color.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            editable={!busy}
+            accessibilityLabel="Nueva contraseña"
+          />
+          <TextInput
+            style={styles.input}
+            value={repeat}
+            onChangeText={setRepeat}
+            placeholder="Repetir la nueva"
+            placeholderTextColor={color.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            editable={!busy}
+            onSubmitEditing={() => void submit()}
+            accessibilityLabel="Repetir la nueva contraseña"
+          />
 
-        {tooShort ? <Text style={styles.hint}>Te faltan caracteres.</Text> : null}
-        {mismatch ? <Text style={styles.hint}>No coinciden.</Text> : null}
-        {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+          {tooShort ? <Text style={styles.hint}>Te faltan caracteres.</Text> : null}
+          {mismatch ? <Text style={styles.hint}>No coinciden.</Text> : null}
+          {error !== null ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable
-          onPress={() => void submit()}
-          disabled={!canSubmit}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.primary,
-            !canSubmit && styles.off,
-            pressed && canSubmit && styles.primaryPressed,
-          ]}
-        >
-          {busy ? (
-            <ActivityIndicator color={color.onAccent} />
-          ) : (
-            <Text style={styles.primaryText}>GUARDAR</Text>
-          )}
-        </Pressable>
+          <Pressable
+            onPress={() => void submit()}
+            disabled={!canSubmit}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.primary,
+              !canSubmit && styles.off,
+              pressed && canSubmit && styles.primaryPressed,
+            ]}
+          >
+            {busy ? (
+              <ActivityIndicator color={color.onAccent} />
+            ) : (
+              <Text style={styles.primaryText}>GUARDAR</Text>
+            )}
+          </Pressable>
 
-        <Pressable onPress={() => void signOut()} accessibilityRole="button">
-          <Text style={styles.link}>Salir</Text>
-        </Pressable>
-      </ScrollView>
+          <Pressable onPress={() => void signOut()} accessibilityRole="button">
+            <Text style={styles.link}>Salir</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -217,6 +220,7 @@ const MONTHS = [
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.bg },
+  lift: { flex: 1 },
   body: {
     flexGrow: 1,
     justifyContent: 'center',

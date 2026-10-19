@@ -25,6 +25,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -377,385 +378,388 @@ export function NewMesoSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Cerrar" />
+      {/* Sube con el teclado: sin esto, en Android tapa el campo que se escribe. */}
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Cerrar" />
 
-      <View style={styles.sheet}>
-        <View style={styles.head}>
-          <View style={styles.headText}>
-            <Text style={styles.title}>
-              {createdMesoId !== null ? 'PAUTAR SEMANAS' : 'NUEVO BLOQUE'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {createdMesoId !== null
-                ? 'Ya está creado. Ajusta lo que quieras; cerrar no pierde nada.'
-                : SUBTITLES[step]}
-            </Text>
+        <View style={styles.sheet}>
+          <View style={styles.head}>
+            <View style={styles.headText}>
+              <Text style={styles.title}>
+                {createdMesoId !== null ? 'PAUTAR SEMANAS' : 'NUEVO BLOQUE'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {createdMesoId !== null
+                  ? 'Ya está creado. Ajusta lo que quieras; cerrar no pierde nada.'
+                  : SUBTITLES[step]}
+              </Text>
+            </View>
+            <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Cerrar" hitSlop={10}>
+              <Ionicons name="close" size={19} color={color.textMuted} />
+            </Pressable>
           </View>
-          <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Cerrar" hitSlop={10}>
-            <Ionicons name="close" size={19} color={color.textMuted} />
-          </Pressable>
-        </View>
 
-        {createdMesoId !== null ? (
-          <ScrollView contentContainerStyle={styles.body}>
-            <PlanGrid mesocycleId={createdMesoId} />
-          </ScrollView>
-        ) : (
-          <>
-        <View style={styles.steps}>
-          {[1, 2, 3].map((n) => (
-            <View key={n} style={[styles.stepDot, n <= step && styles.stepDotOn]} />
-          ))}
-        </View>
-
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          {step === 1 ? (
+          {createdMesoId !== null ? (
+            <ScrollView contentContainerStyle={styles.body}>
+              <PlanGrid mesocycleId={createdMesoId} />
+            </ScrollView>
+          ) : (
             <>
-              <Text style={styles.label}>Atleta</Text>
-              {athletes.length === 0 ? (
-                <Text style={styles.help}>
-                  Todavía no llevas a nadie. Pídele al administrador que te
-                  asigne atletas.
-                </Text>
-              ) : (
+          <View style={styles.steps}>
+            {[1, 2, 3].map((n) => (
+              <View key={n} style={[styles.stepDot, n <= step && styles.stepDotOn]} />
+            ))}
+          </View>
+
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {step === 1 ? (
+              <>
+                <Text style={styles.label}>Atleta</Text>
+                {athletes.length === 0 ? (
+                  <Text style={styles.help}>
+                    Todavía no llevas a nadie. Pídele al administrador que te
+                    asigne atletas.
+                  </Text>
+                ) : (
+                  <View style={styles.chips}>
+                    {athletes.map((a) => (
+                      <Chip
+                        key={a.id}
+                        label={a.displayName}
+                        active={athleteId === a.id}
+                        onPress={() => setAthleteId(a.id)}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                <Text style={styles.label}>Nombre</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Push/Pull/Legs"
+                  placeholderTextColor={color.textFaint}
+                  accessibilityLabel="Nombre del bloque"
+                />
+
+                <Text style={styles.label}>Objetivo</Text>
                 <View style={styles.chips}>
-                  {athletes.map((a) => (
+                  {GOALS.map((g) => (
                     <Chip
-                      key={a.id}
-                      label={a.displayName}
-                      active={athleteId === a.id}
-                      onPress={() => setAthleteId(a.id)}
+                      key={g}
+                      label={GOAL_LABEL[g]}
+                      active={goal === g}
+                      onPress={() => setGoal(g)}
                     />
                   ))}
                 </View>
-              )}
+                <Text style={styles.help}>{GOAL_PRESET[goal].help}</Text>
 
-              <Text style={styles.label}>Nombre</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Push/Pull/Legs"
-                placeholderTextColor={color.textFaint}
-                accessibilityLabel="Nombre del bloque"
-              />
-
-              <Text style={styles.label}>Objetivo</Text>
-              <View style={styles.chips}>
-                {GOALS.map((g) => (
-                  <Chip
-                    key={g}
-                    label={GOAL_LABEL[g]}
-                    active={goal === g}
-                    onPress={() => setGoal(g)}
-                  />
-                ))}
-              </View>
-              <Text style={styles.help}>{GOAL_PRESET[goal].help}</Text>
-
-              <Text style={styles.label}>Duración</Text>
-              <View style={styles.chips}>
-                {WEEKS.map((w) => (
-                  <Chip
-                    key={w}
-                    label={`${w} sem`}
-                    active={weeks === w}
-                    onPress={() => setWeeks(w)}
-                  />
-                ))}
-              </View>
-              <Text style={styles.help}>
-                La última semana es el deload: el motor baja la carga al 75% y
-                recorta el volumen.
-              </Text>
-
-              <Text style={styles.label}>Días por semana</Text>
-              <View style={styles.chips}>
-                {DAYS_PER_WEEK.map((n) => (
-                  <Chip
-                    key={n}
-                    label={String(n)}
-                    active={daysPerWeek === n}
-                    onPress={() => changeDaysPerWeek(n)}
-                  />
-                ))}
-              </View>
-              <Text style={styles.help}>
-                El reparto de ejercicios entre los días es fijo para todo el bloque.
-              </Text>
-
-              <Text style={styles.label}>Agresividad</Text>
-              <View style={styles.chips}>
-                {AGGRESSIVENESS.map((a) => (
-                  <Chip
-                    key={a}
-                    label={a}
-                    active={aggressiveness === a}
-                    onPress={() => setAggressiveness(a)}
-                  />
-                ))}
-              </View>
-              <Text style={styles.help}>{AGGRESSIVENESS_HELP[aggressiveness]}</Text>
-            </>
-          ) : null}
-
-          {step === 2 ? (
-            <>
-              <Text style={styles.label}>NOMBRE DE CADA DÍA (OPCIONAL)</Text>
-              {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
-                <View key={n} style={styles.dayNameRow}>
-                  <Text style={styles.dayNameLabel}>Día {n} ·</Text>
-                  <TextInput
-                    style={[styles.input, styles.dayNameInput]}
-                    value={dayNames[n] ?? ''}
-                    onChangeText={(t) => setDayNames((cur) => ({ ...cur, [n]: t }))}
-                    placeholder="Empuje, Pierna..."
-                    placeholderTextColor={color.textFaint}
-                    maxLength={40}
-                    accessibilityLabel={`Nombre del día ${n}`}
-                  />
+                <Text style={styles.label}>Duración</Text>
+                <View style={styles.chips}>
+                  {WEEKS.map((w) => (
+                    <Chip
+                      key={w}
+                      label={`${w} sem`}
+                      active={weeks === w}
+                      onPress={() => setWeeks(w)}
+                    />
+                  ))}
                 </View>
-              ))}
-
-              <TextInput
-                style={styles.input}
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Buscar ejercicio o músculo"
-                placeholderTextColor={color.textFaint}
-                autoCorrect={false}
-                accessibilityLabel="Buscar ejercicio"
-              />
-              <Text style={styles.help}>
-                {drafts.length === 0
-                  ? 'Elige los ejercicios del bloque.'
-                  : `${drafts.length} elegidos.`}
-              </Text>
-              {daysWithoutExercises.length > 0 ? (
-                <Text style={styles.error}>
-                  {daysWithoutExercises.length === 1 ? 'El día' : 'Los días'}{' '}
-                  {daysWithoutExercises.join(', ')} se queda
-                  {daysWithoutExercises.length === 1 ? '' : 'n'} sin ejercicios. Asigna
-                  al menos uno a cada día.
+                <Text style={styles.help}>
+                  La última semana es el deload: el motor baja la carga al 75% y
+                  recorta el volumen.
                 </Text>
-              ) : null}
 
-              {catalog.loading && catalog.data === null ? (
-                <ActivityIndicator color={color.accent} style={{ marginTop: space.lg }} />
-              ) : null}
-
-              {catalog.data !== null && totalVisible === 0 ? (
-                <Text style={styles.help}>Nada coincide con esa búsqueda.</Text>
-              ) : null}
-
-              {grouped.map((group) => (
-                <View key={group.muscle} style={styles.group}>
-                  <View style={styles.groupHead}>
-                    <Text style={styles.groupTitle}>{group.label}</Text>
-                    <Text style={styles.groupCount}>{group.items.length}</Text>
-                  </View>
-
-                  {group.items.map((item) => {
-                    const on = chosen.has(item.id);
-                    const draft = drafts.find((d) => d.catalogId === item.id);
-                    return (
-                      <View key={item.id} style={styles.pick}>
-                      <Pressable
-                        onPress={() => toggle(item)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${on ? 'Quitar' : 'Añadir'} ${item.name}`}
-                        style={({ pressed }) => [
-                          styles.row,
-                          on && styles.rowOn,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                      >
-                        <Ionicons
-                          name={on ? 'checkbox' : 'square-outline'}
-                          size={18}
-                          color={on ? color.accent : color.textFaint}
-                        />
-                        <View style={styles.rowText}>
-                          <Text style={styles.rowName}>{item.name}</Text>
-                          <Text style={styles.rowMeta}>{item.equipment}</Text>
-                        </View>
-                      </Pressable>
-                      {on && draft !== undefined && daysPerWeek > 1 ? (
-                        <View style={styles.dayChips}>
-                          {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
-                            <Chip
-                              key={n}
-                              label={`D${n}`}
-                              active={draft.dayNumber === n}
-                              onPress={() => patch(item.id, { dayNumber: n })}
-                            />
-                          ))}
-                        </View>
-                      ) : null}
-                      </View>
-                    );
-                  })}
+                <Text style={styles.label}>Días por semana</Text>
+                <View style={styles.chips}>
+                  {DAYS_PER_WEEK.map((n) => (
+                    <Chip
+                      key={n}
+                      label={String(n)}
+                      active={daysPerWeek === n}
+                      onPress={() => changeDaysPerWeek(n)}
+                    />
+                  ))}
                 </View>
-              ))}
-            </>
-          ) : null}
+                <Text style={styles.help}>
+                  El reparto de ejercicios entre los días es fijo para todo el bloque.
+                </Text>
 
-          {step === 3 ? (
-            <>
-              <Text style={styles.help}>
-                Los básicos exigen carga en TODAS las semanas —en kilos o en %
-                del 1RM del atleta—, porque así se programa fuerza. Los
-                accesorios quedan libres: el atleta registra lo que levante y
-                el motor progresa desde ahí, o los fijás luego desde la tabla.
-              </Text>
+                <Text style={styles.label}>Agresividad</Text>
+                <View style={styles.chips}>
+                  {AGGRESSIVENESS.map((a) => (
+                    <Chip
+                      key={a}
+                      label={a}
+                      active={aggressiveness === a}
+                      onPress={() => setAggressiveness(a)}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.help}>{AGGRESSIVENESS_HELP[aggressiveness]}</Text>
+              </>
+            ) : null}
 
-              {groupByDay(drafts).map((group) => (
-                <View key={group.dayNumber} style={styles.dayGroup}>
-                  <Text style={styles.groupTitle}>
-                    {dayHeading(group.dayNumber, namedDays)}
+            {step === 2 ? (
+              <>
+                <Text style={styles.label}>NOMBRE DE CADA DÍA (OPCIONAL)</Text>
+                {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
+                  <View key={n} style={styles.dayNameRow}>
+                    <Text style={styles.dayNameLabel}>Día {n} ·</Text>
+                    <TextInput
+                      style={[styles.input, styles.dayNameInput]}
+                      value={dayNames[n] ?? ''}
+                      onChangeText={(t) => setDayNames((cur) => ({ ...cur, [n]: t }))}
+                      placeholder="Empuje, Pierna..."
+                      placeholderTextColor={color.textFaint}
+                      maxLength={40}
+                      accessibilityLabel={`Nombre del día ${n}`}
+                    />
+                  </View>
+                ))}
+
+                <TextInput
+                  style={styles.input}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Buscar ejercicio o músculo"
+                  placeholderTextColor={color.textFaint}
+                  autoCorrect={false}
+                  accessibilityLabel="Buscar ejercicio"
+                />
+                <Text style={styles.help}>
+                  {drafts.length === 0
+                    ? 'Elige los ejercicios del bloque.'
+                    : `${drafts.length} elegidos.`}
+                </Text>
+                {daysWithoutExercises.length > 0 ? (
+                  <Text style={styles.error}>
+                    {daysWithoutExercises.length === 1 ? 'El día' : 'Los días'}{' '}
+                    {daysWithoutExercises.join(', ')} se queda
+                    {daysWithoutExercises.length === 1 ? '' : 'n'} sin ejercicios. Asigna
+                    al menos uno a cada día.
                   </Text>
-                  {group.items.map((d) => {
-                const missing = missingWeeksFor(d, weeks);
-                const isBasico = d.muscle === 'BASICOS';
-                return (
-                  <View key={d.catalogId} style={styles.draft}>
-                    <Text style={styles.rowName}>{d.name}</Text>
-                    <Text style={styles.rowMeta}>
-                      {muscleLabel(d.muscle)} · {d.repLo}–{d.repHi} reps · RIR{' '}
-                      {d.targetRir}
-                    </Text>
+                ) : null}
 
-                    <View style={styles.fields}>
-                      <NumberField
-                        label="Reps"
-                        value={d.startingReps}
-                        onChange={(v) => patch(d.catalogId, { startingReps: v })}
-                      />
-                      <NumberField
-                        label="Sets"
-                        value={d.startingSets}
-                        onChange={(v) => patch(d.catalogId, { startingSets: v })}
-                      />
+                {catalog.loading && catalog.data === null ? (
+                  <ActivityIndicator color={color.accent} style={{ marginTop: space.lg }} />
+                ) : null}
+
+                {catalog.data !== null && totalVisible === 0 ? (
+                  <Text style={styles.help}>Nada coincide con esa búsqueda.</Text>
+                ) : null}
+
+                {grouped.map((group) => (
+                  <View key={group.muscle} style={styles.group}>
+                    <View style={styles.groupHead}>
+                      <Text style={styles.groupTitle}>{group.label}</Text>
+                      <Text style={styles.groupCount}>{group.items.length}</Text>
                     </View>
 
-                    {isBasico ? (
-                      <>
-                        <Text style={styles.weekGridLabel}>
-                          Semana a semana: carga obligatoria (% o kg)
-                        </Text>
-                        <WeekPlanGrid
-                          totalWeeks={weeks}
-                          weeks={d.weeks}
-                          unit={unit}
-                          defaultSets={d.startingSets}
-                          defaultReps={`${d.repLo}-${d.repHi}`}
-                          onChange={(next) => patch(d.catalogId, { weeks: next })}
-                        />
-                        {missing.length > 0 ? (
-                          <Text style={styles.error}>
-                            Falta la carga de la semana{missing.length > 1 ? 's' : ''}{' '}
-                            {missing.join(', ')}.
-                          </Text>
+                    {group.items.map((item) => {
+                      const on = chosen.has(item.id);
+                      const draft = drafts.find((d) => d.catalogId === item.id);
+                      return (
+                        <View key={item.id} style={styles.pick}>
+                        <Pressable
+                          onPress={() => toggle(item)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${on ? 'Quitar' : 'Añadir'} ${item.name}`}
+                          style={({ pressed }) => [
+                            styles.row,
+                            on && styles.rowOn,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                        >
+                          <Ionicons
+                            name={on ? 'checkbox' : 'square-outline'}
+                            size={18}
+                            color={on ? color.accent : color.textFaint}
+                          />
+                          <View style={styles.rowText}>
+                            <Text style={styles.rowName}>{item.name}</Text>
+                            <Text style={styles.rowMeta}>{item.equipment}</Text>
+                          </View>
+                        </Pressable>
+                        {on && draft !== undefined && daysPerWeek > 1 ? (
+                          <View style={styles.dayChips}>
+                            {Array.from({ length: daysPerWeek }, (_, i) => i + 1).map((n) => (
+                              <Chip
+                                key={n}
+                                label={`D${n}`}
+                                active={draft.dayNumber === n}
+                                onPress={() => patch(item.id, { dayNumber: n })}
+                              />
+                            ))}
+                          </View>
                         ) : null}
-                      </>
-                    ) : (
-                      <Text style={styles.help}>
-                        Sin carga de arranque: es un accesorio.
-                      </Text>
-                    )}
+                        </View>
+                      );
+                    })}
                   </View>
-                );
-                  })}
-                </View>
-              ))}
+                ))}
+              </>
+            ) : null}
 
-              {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-            </>
-          ) : null}
-        </ScrollView>
+            {step === 3 ? (
+              <>
+                <Text style={styles.help}>
+                  Los básicos exigen carga en TODAS las semanas —en kilos o en %
+                  del 1RM del atleta—, porque así se programa fuerza. Los
+                  accesorios quedan libres: el atleta registra lo que levante y
+                  el motor progresa desde ahí, o los fijás luego desde la tabla.
+                </Text>
 
-        {step === 3 && pendientes.length > 0 ? (
-          <View style={styles.blocker}>
-            <Text style={styles.blockerTitle}>
-              Falta carga para poder crear el bloque
-            </Text>
-            {pendientes.map((p) => (
-              <Text key={p.name} style={styles.blockerItem}>
-                {p.name} · semana{p.missing.length > 1 ? 's' : ''}{' '}
-                {p.missing.join(', ')}
+                {groupByDay(drafts).map((group) => (
+                  <View key={group.dayNumber} style={styles.dayGroup}>
+                    <Text style={styles.groupTitle}>
+                      {dayHeading(group.dayNumber, namedDays)}
+                    </Text>
+                    {group.items.map((d) => {
+                  const missing = missingWeeksFor(d, weeks);
+                  const isBasico = d.muscle === 'BASICOS';
+                  return (
+                    <View key={d.catalogId} style={styles.draft}>
+                      <Text style={styles.rowName}>{d.name}</Text>
+                      <Text style={styles.rowMeta}>
+                        {muscleLabel(d.muscle)} · {d.repLo}–{d.repHi} reps · RIR{' '}
+                        {d.targetRir}
+                      </Text>
+
+                      <View style={styles.fields}>
+                        <NumberField
+                          label="Reps"
+                          value={d.startingReps}
+                          onChange={(v) => patch(d.catalogId, { startingReps: v })}
+                        />
+                        <NumberField
+                          label="Sets"
+                          value={d.startingSets}
+                          onChange={(v) => patch(d.catalogId, { startingSets: v })}
+                        />
+                      </View>
+
+                      {isBasico ? (
+                        <>
+                          <Text style={styles.weekGridLabel}>
+                            Semana a semana: carga obligatoria (% o kg)
+                          </Text>
+                          <WeekPlanGrid
+                            totalWeeks={weeks}
+                            weeks={d.weeks}
+                            unit={unit}
+                            defaultSets={d.startingSets}
+                            defaultReps={`${d.repLo}-${d.repHi}`}
+                            onChange={(next) => patch(d.catalogId, { weeks: next })}
+                          />
+                          {missing.length > 0 ? (
+                            <Text style={styles.error}>
+                              Falta la carga de la semana{missing.length > 1 ? 's' : ''}{' '}
+                              {missing.join(', ')}.
+                            </Text>
+                          ) : null}
+                        </>
+                      ) : (
+                        <Text style={styles.help}>
+                          Sin carga de arranque: es un accesorio.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                    })}
+                  </View>
+                ))}
+
+                {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+              </>
+            ) : null}
+          </ScrollView>
+
+          {step === 3 && pendientes.length > 0 ? (
+            <View style={styles.blocker}>
+              <Text style={styles.blockerTitle}>
+                Falta carga para poder crear el bloque
               </Text>
-            ))}
-            <Text style={styles.blockerHelp}>
-              Los básicos llevan carga en todas las semanas. Escribe un
-              porcentaje (75%) o kilos (102.5) en cada casilla.
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.footer}>
-          {step > 1 ? (
-            <Pressable
-              onPress={() => setStep((s) => (s - 1) as Step)}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
-            >
-              <Text style={styles.secondaryText}>Atrás</Text>
-            </Pressable>
+              {pendientes.map((p) => (
+                <Text key={p.name} style={styles.blockerItem}>
+                  {p.name} · semana{p.missing.length > 1 ? 's' : ''}{' '}
+                  {p.missing.join(', ')}
+                </Text>
+              ))}
+              <Text style={styles.blockerHelp}>
+                Los básicos llevan carga en todas las semanas. Escribe un
+                porcentaje (75%) o kilos (102.5) en cada casilla.
+              </Text>
+            </View>
           ) : null}
 
-          {step < 3 ? (
-            <Pressable
-              onPress={() => setStep((s) => (s + 1) as Step)}
-              disabled={!canAdvance}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.primary,
-                !canAdvance && styles.off,
-                pressed && canAdvance && styles.primaryPressed,
-              ]}
-            >
-              <Text style={styles.primaryText}>SIGUIENTE</Text>
-            </Pressable>
-          ) : (
-            <>
+          <View style={styles.footer}>
+            {step > 1 ? (
               <Pressable
-                onPress={() => void submit(false)}
-                disabled={!canAdvance || busy}
+                onPress={() => setStep((s) => (s - 1) as Step)}
                 accessibilityRole="button"
-                style={({ pressed }) => [
-                  styles.secondary,
-                  (!canAdvance || busy) && styles.off,
-                  pressed && canAdvance && !busy && { opacity: 0.7 },
-                ]}
+                style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
               >
-                {pendingAction === 'crear' ? (
-                  <ActivityIndicator color={color.textMuted} />
-                ) : (
-                  <Text style={styles.secondaryText}>CREAR</Text>
-                )}
+                <Text style={styles.secondaryText}>Atrás</Text>
               </Pressable>
+            ) : null}
+
+            {step < 3 ? (
               <Pressable
-                onPress={() => void submit(true)}
-                disabled={!canAdvance || busy}
+                onPress={() => setStep((s) => (s + 1) as Step)}
+                disabled={!canAdvance}
                 accessibilityRole="button"
                 style={({ pressed }) => [
                   styles.primary,
-                  (!canAdvance || busy) && styles.off,
-                  pressed && canAdvance && !busy && styles.primaryPressed,
+                  !canAdvance && styles.off,
+                  pressed && canAdvance && styles.primaryPressed,
                 ]}
               >
-                {pendingAction === 'pautar' ? (
-                  <ActivityIndicator color={color.onAccent} />
-                ) : (
-                  <Text style={styles.primaryText}>PAUTAR SEMANAS</Text>
-                )}
+                <Text style={styles.primaryText}>SIGUIENTE</Text>
               </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => void submit(false)}
+                  disabled={!canAdvance || busy}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.secondary,
+                    (!canAdvance || busy) && styles.off,
+                    pressed && canAdvance && !busy && { opacity: 0.7 },
+                  ]}
+                >
+                  {pendingAction === 'crear' ? (
+                    <ActivityIndicator color={color.textMuted} />
+                  ) : (
+                    <Text style={styles.secondaryText}>CREAR</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => void submit(true)}
+                  disabled={!canAdvance || busy}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.primary,
+                    (!canAdvance || busy) && styles.off,
+                    pressed && canAdvance && !busy && styles.primaryPressed,
+                  ]}
+                >
+                  {pendingAction === 'pautar' ? (
+                    <ActivityIndicator color={color.onAccent} />
+                  ) : (
+                    <Text style={styles.primaryText}>PAUTAR SEMANAS</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </View>
             </>
           )}
         </View>
-          </>
-        )}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -993,6 +997,7 @@ function WeekPlanGrid({
 }
 
 const styles = StyleSheet.create({
+  lift: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: {
     maxHeight: '88%',

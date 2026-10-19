@@ -17,7 +17,6 @@ import {
   Easing,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -101,7 +100,9 @@ export function CredentialsSheet({
     >
       <KeyboardAvoidingView
         style={styles.fill}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // En los dos sistemas: en Android el Modal translucido no se encoge con
+        // el teclado, y sin esto tapaba el email y la contraseña.
+        behavior="padding"
       >
         <Pressable style={styles.backdrop} onPress={onCancel} accessible={false} />
 

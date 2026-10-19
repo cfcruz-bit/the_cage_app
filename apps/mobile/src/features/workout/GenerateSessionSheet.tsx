@@ -13,6 +13,7 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -87,106 +88,110 @@ export function GenerateSessionSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+      {/* Sube con el teclado: sin esto, en Android tapa el campo que se escribe. */}
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
 
-      <View style={styles.sheet}>
-        <View style={styles.head}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>GENERAR SESIÓN</Text>
-            <Text style={styles.subtitle}>El motor calcula y congela el plan</Text>
+        <View style={styles.sheet}>
+          <View style={styles.head}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>GENERAR SESIÓN</Text>
+              <Text style={styles.subtitle}>El motor calcula y congela el plan</Text>
+            </View>
+            <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
+              <Ionicons name="close" size={19} color={color.textMuted} />
+            </Pressable>
           </View>
-          <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
-            <Ionicons name="close" size={19} color={color.textMuted} />
-          </Pressable>
-        </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.label}>Bloque</Text>
-          {mesos.loading && mesos.data === null ? (
-            <ActivityIndicator color={color.accent} />
-          ) : list.length === 0 ? (
-            <Text style={styles.help}>
-              No tienes bloques activos. Crea uno en la pestaña Bloques.
-            </Text>
-          ) : (
-            <View style={styles.chips}>
-              {list.map((m) => (
-                <Chip
-                  key={m.id}
-                  label={`${m.athleteName} · ${m.name}`}
-                  active={mesoId === m.id}
-                  onPress={() => {
-                    setMesoId(m.id);
-                    setDay(1);
-                    // La semana en curso del bloque es la respuesta correcta
-                    // casi siempre; se deja editable por si no lo es.
-                    setWeek(String(m.currentWeekIndex + 1));
-                  }}
-                />
-              ))}
-            </View>
-          )}
-
-          <Text style={styles.label}>Semana</Text>
-          <TextInput
-            style={styles.input}
-            value={week}
-            onChangeText={setWeek}
-            keyboardType="numeric"
-            accessibilityLabel="Semana"
-          />
-          {chosen !== null ? (
-            <Text style={styles.help}>
-              Este bloque tiene {chosen.totalWeeks} semanas; la última es el deload.
-            </Text>
-          ) : null}
-
-          <Text style={styles.label}>Día</Text>
-          {chosen !== null ? (
-            <View style={styles.chips}>
-              {Array.from({ length: chosen.daysPerWeek }, (_, i) => i + 1).map((n) => (
-                <Chip
-                  key={n}
-                  label={dayLabel(n, chosen.days)}
-                  active={day === n}
-                  onPress={() => setDay(n)}
-                />
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.help}>Elige primero el bloque.</Text>
-          )}
-          <Text style={styles.help}>
-            Si ese día ya tiene una sesión abierta esa semana, se abre la misma.
-          </Text>
-
-          {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <Pressable
-            onPress={() => void submit()}
-            disabled={chosen === null || busy}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.primary,
-              (chosen === null || busy) && styles.off,
-              pressed && chosen !== null && !busy && { backgroundColor: palette.accentEdge },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={color.onAccent} />
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            <Text style={styles.label}>Bloque</Text>
+            {mesos.loading && mesos.data === null ? (
+              <ActivityIndicator color={color.accent} />
+            ) : list.length === 0 ? (
+              <Text style={styles.help}>
+                No tienes bloques activos. Crea uno en la pestaña Bloques.
+              </Text>
             ) : (
-              <Text style={styles.primaryText}>GENERAR</Text>
+              <View style={styles.chips}>
+                {list.map((m) => (
+                  <Chip
+                    key={m.id}
+                    label={`${m.athleteName} · ${m.name}`}
+                    active={mesoId === m.id}
+                    onPress={() => {
+                      setMesoId(m.id);
+                      setDay(1);
+                      // La semana en curso del bloque es la respuesta correcta
+                      // casi siempre; se deja editable por si no lo es.
+                      setWeek(String(m.currentWeekIndex + 1));
+                    }}
+                  />
+                ))}
+              </View>
             )}
-          </Pressable>
+
+            <Text style={styles.label}>Semana</Text>
+            <TextInput
+              style={styles.input}
+              value={week}
+              onChangeText={setWeek}
+              keyboardType="numeric"
+              accessibilityLabel="Semana"
+            />
+            {chosen !== null ? (
+              <Text style={styles.help}>
+                Este bloque tiene {chosen.totalWeeks} semanas; la última es el deload.
+              </Text>
+            ) : null}
+
+            <Text style={styles.label}>Día</Text>
+            {chosen !== null ? (
+              <View style={styles.chips}>
+                {Array.from({ length: chosen.daysPerWeek }, (_, i) => i + 1).map((n) => (
+                  <Chip
+                    key={n}
+                    label={dayLabel(n, chosen.days)}
+                    active={day === n}
+                    onPress={() => setDay(n)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.help}>Elige primero el bloque.</Text>
+            )}
+            <Text style={styles.help}>
+              Si ese día ya tiene una sesión abierta esa semana, se abre la misma.
+            </Text>
+
+            {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Pressable
+              onPress={() => void submit()}
+              disabled={chosen === null || busy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.primary,
+                (chosen === null || busy) && styles.off,
+                pressed && chosen !== null && !busy && { backgroundColor: palette.accentEdge },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={color.onAccent} />
+              ) : (
+                <Text style={styles.primaryText}>GENERAR</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  lift: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: {
     maxHeight: '82%',

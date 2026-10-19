@@ -14,6 +14,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -200,124 +201,127 @@ function AddRecordSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+      {/* Sube con el teclado: sin esto, en Android tapa el campo que se escribe. */}
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
 
-      <View style={styles.sheet}>
-        <View style={styles.sheetHead}>
-          <Text style={styles.sheetTitle}>REGISTRAR MARCA</Text>
-          <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
-            <Ionicons name="close" size={19} color={color.textMuted} />
-          </Pressable>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>Ejercicio</Text>
-            <Pressable onPress={() => setOnlyBasicos((v) => !v)} hitSlop={6}>
-              <Text style={styles.toggle}>
-                {onlyBasicos ? 'Ver todos' : 'Solo básicos'}
-              </Text>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHead}>
+            <Text style={styles.sheetTitle}>REGISTRAR MARCA</Text>
+            <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
+              <Ionicons name="close" size={19} color={color.textMuted} />
             </Pressable>
           </View>
 
-          {catalog.loading && catalog.data === null ? (
-            <ActivityIndicator color={color.accent} style={{ marginVertical: space.sm }} />
-          ) : null}
-
-          {grouped.map((g) => (
-            <View key={g.muscle} style={styles.group}>
-              <Text style={styles.groupTitle}>{g.label}</Text>
-              <View style={styles.chips}>
-                {g.items.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => setExerciseId(item.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.name}
-                    style={[styles.chip, exerciseId === item.id && styles.chipOn]}
-                  >
-                    <Text
-                      style={[styles.chipText, exerciseId === item.id && styles.chipTextOn]}
-                    >
-                      {item.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ))}
-
-          <Text style={styles.fieldLabel}>Kilos</Text>
-          <TextInput
-            style={styles.input}
-            value={kg}
-            onChangeText={setKg}
-            keyboardType="decimal-pad"
-            placeholder="140"
-            placeholderTextColor={color.textFaint}
-            accessibilityLabel="Kilos de la marca"
-          />
-
-          <Text style={styles.fieldLabel}>Fecha del test (AAAA-MM-DD)</Text>
-          <TextInput
-            style={styles.input}
-            value={achievedOn}
-            onChangeText={setAchievedOn}
-            placeholder={todayIso()}
-            placeholderTextColor={color.textFaint}
-            autoCapitalize="none"
-            accessibilityLabel="Fecha del test"
-          />
-
-          <Text style={styles.fieldLabel}>Origen</Text>
-          <View style={styles.chips}>
-            {(Object.keys(SOURCE_LABEL) as OneRepMaxSource[]).map((s) => (
-              <Pressable
-                key={s}
-                onPress={() => setSource(s)}
-                accessibilityRole="button"
-                accessibilityLabel={SOURCE_LABEL[s]}
-                style={[styles.chip, source === s && styles.chipOn]}
-              >
-                <Text style={[styles.chipText, source === s && styles.chipTextOn]}>
-                  {SOURCE_LABEL[s]}
+          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Ejercicio</Text>
+              <Pressable onPress={() => setOnlyBasicos((v) => !v)} hitSlop={6}>
+                <Text style={styles.toggle}>
+                  {onlyBasicos ? 'Ver todos' : 'Solo básicos'}
                 </Text>
               </Pressable>
+            </View>
+
+            {catalog.loading && catalog.data === null ? (
+              <ActivityIndicator color={color.accent} style={{ marginVertical: space.sm }} />
+            ) : null}
+
+            {grouped.map((g) => (
+              <View key={g.muscle} style={styles.group}>
+                <Text style={styles.groupTitle}>{g.label}</Text>
+                <View style={styles.chips}>
+                  {g.items.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => setExerciseId(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.name}
+                      style={[styles.chip, exerciseId === item.id && styles.chipOn]}
+                    >
+                      <Text
+                        style={[styles.chipText, exerciseId === item.id && styles.chipTextOn]}
+                      >
+                        {item.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             ))}
+
+            <Text style={styles.fieldLabel}>Kilos</Text>
+            <TextInput
+              style={styles.input}
+              value={kg}
+              onChangeText={setKg}
+              keyboardType="decimal-pad"
+              placeholder="140"
+              placeholderTextColor={color.textFaint}
+              accessibilityLabel="Kilos de la marca"
+            />
+
+            <Text style={styles.fieldLabel}>Fecha del test (AAAA-MM-DD)</Text>
+            <TextInput
+              style={styles.input}
+              value={achievedOn}
+              onChangeText={setAchievedOn}
+              placeholder={todayIso()}
+              placeholderTextColor={color.textFaint}
+              autoCapitalize="none"
+              accessibilityLabel="Fecha del test"
+            />
+
+            <Text style={styles.fieldLabel}>Origen</Text>
+            <View style={styles.chips}>
+              {(Object.keys(SOURCE_LABEL) as OneRepMaxSource[]).map((s) => (
+                <Pressable
+                  key={s}
+                  onPress={() => setSource(s)}
+                  accessibilityRole="button"
+                  accessibilityLabel={SOURCE_LABEL[s]}
+                  style={[styles.chip, source === s && styles.chipOn]}
+                >
+                  <Text style={[styles.chipText, source === s && styles.chipTextOn]}>
+                    {SOURCE_LABEL[s]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>NOTA (opcional)</Text>
+            <TextInput
+              style={styles.input}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Con cinturón, sin monolift..."
+              placeholderTextColor={color.textFaint}
+              accessibilityLabel="Nota"
+            />
+
+            {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+          </ScrollView>
+
+          <View style={styles.sheetFooter}>
+            <Pressable
+              onPress={() => void save()}
+              disabled={exerciseId === null || busy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.primary,
+                (exerciseId === null || busy) && styles.off,
+                pressed && exerciseId !== null && !busy && styles.primaryPressed,
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={color.onAccent} />
+              ) : (
+                <Text style={styles.primaryText}>GUARDAR</Text>
+              )}
+            </Pressable>
           </View>
-
-          <Text style={styles.fieldLabel}>NOTA (opcional)</Text>
-          <TextInput
-            style={styles.input}
-            value={note}
-            onChangeText={setNote}
-            placeholder="Con cinturón, sin monolift..."
-            placeholderTextColor={color.textFaint}
-            accessibilityLabel="Nota"
-          />
-
-          {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
-
-        <View style={styles.sheetFooter}>
-          <Pressable
-            onPress={() => void save()}
-            disabled={exerciseId === null || busy}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.primary,
-              (exerciseId === null || busy) && styles.off,
-              pressed && exerciseId !== null && !busy && styles.primaryPressed,
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={color.onAccent} />
-            ) : (
-              <Text style={styles.primaryText}>GUARDAR</Text>
-            )}
-          </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -348,6 +352,8 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     marginRight: space.sm,
   },
+
+  lift: { flex: 1 },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: {

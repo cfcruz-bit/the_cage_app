@@ -18,6 +18,7 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
@@ -351,102 +352,105 @@ function CellSheet({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+      {/* Sube con el teclado: sin esto, en Android tapa el campo que se escribe. */}
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
 
-      <View style={styles.sheet}>
-        <View style={styles.sheetHead}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sheetTitle}>{row.name.toUpperCase()}</Text>
-            <Text style={styles.meta}>
-              {cell.isDeload ? 'Semana de deload' : `Semana ${cell.weekNumber}`}
-            </Text>
-          </View>
-          <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
-            <Ionicons name="close" size={19} color={color.textMuted} />
-          </Pressable>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-          <Text style={styles.hint}>
-            Lo que dejes vacío lo decide el motor. Es como devuelves una celda a
-            automático sin borrar el resto.
-          </Text>
-
-          <View style={styles.fields}>
-            <Field label="Sets" value={sets} onChange={setSets} auto={String(cell.sets)} />
-            <Field
-              label="CARGA (% o KG)"
-              value={load}
-              onChange={setLoad}
-              auto={cell.loadKg === null ? '—' : String(cell.loadKg)}
-            />
-            <Field label="RIR" value={rir} onChange={setRir} auto={String(cell.targetRir)} />
-          </View>
-
-          <View style={styles.fields}>
-            <Field label="Reps mín." value={repLo} onChange={setRepLo} auto={String(cell.repLo)} />
-            <Field label="Reps máx." value={repHi} onChange={setRepHi} auto={String(cell.repHi)} />
-            <Field label="Descanso (s)" value={rest} onChange={setRest} auto="" />
-          </View>
-
-          <Text style={styles.hintFaint}>
-            El descanso siempre lo pautas tú: no tiene modo automático.
-          </Text>
-
-          {isBasico ? (
-            <>
-              <Text style={styles.fieldLabel}>Back-off (opcional)</Text>
-              <Text style={styles.hintFaint}>
-                Con back-off, sets, reps y carga de arriba son el TOP set. La carga del
-                back-off es fija: no depende de lo que salga el top.
+        <View style={styles.sheet}>
+          <View style={styles.sheetHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sheetTitle}>{row.name.toUpperCase()}</Text>
+              <Text style={styles.meta}>
+                {cell.isDeload ? 'Semana de deload' : `Semana ${cell.weekNumber}`}
               </Text>
-              <View style={styles.fields}>
-                <Field label="Sets" value={bSets} onChange={setBSets} auto="—" />
-                <Field label="Reps" value={bReps} onChange={setBReps} auto="—" />
-                <Field label="CARGA (% o KG)" value={bLoad} onChange={setBLoad} auto="—" />
-              </View>
-            </>
-          ) : null}
+            </View>
+            <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
+              <Ionicons name="close" size={19} color={color.textMuted} />
+            </Pressable>
+          </View>
 
-          {error !== null ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <Text style={styles.hint}>
+              Lo que dejes vacío lo decide el motor. Es como devuelves una celda a
+              automático sin borrar el resto.
+            </Text>
 
-        <View style={styles.sheetFooter}>
-          <Pressable
-            onPress={() => {
-              setSets('');
-              setLoad('');
-              setRepLo('');
-              setRepHi('');
-              setRir('');
-              setBSets('');
-              setBReps('');
-              setBLoad('');
-            }}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={styles.secondaryText}>Todo automático</Text>
-          </Pressable>
+            <View style={styles.fields}>
+              <Field label="Sets" value={sets} onChange={setSets} auto={String(cell.sets)} />
+              <Field
+                label="CARGA (% o KG)"
+                value={load}
+                onChange={setLoad}
+                auto={cell.loadKg === null ? '—' : String(cell.loadKg)}
+              />
+              <Field label="RIR" value={rir} onChange={setRir} auto={String(cell.targetRir)} />
+            </View>
 
-          <Pressable
-            onPress={() => void save()}
-            disabled={busy}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.primary,
-              busy && { opacity: 0.4 },
-              pressed && !busy && { backgroundColor: palette.accentEdge },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={color.onAccent} />
-            ) : (
-              <Text style={styles.primaryText}>GUARDAR</Text>
-            )}
-          </Pressable>
+            <View style={styles.fields}>
+              <Field label="Reps mín." value={repLo} onChange={setRepLo} auto={String(cell.repLo)} />
+              <Field label="Reps máx." value={repHi} onChange={setRepHi} auto={String(cell.repHi)} />
+              <Field label="Descanso (s)" value={rest} onChange={setRest} auto="" />
+            </View>
+
+            <Text style={styles.hintFaint}>
+              El descanso siempre lo pautas tú: no tiene modo automático.
+            </Text>
+
+            {isBasico ? (
+              <>
+                <Text style={styles.fieldLabel}>Back-off (opcional)</Text>
+                <Text style={styles.hintFaint}>
+                  Con back-off, sets, reps y carga de arriba son el TOP set. La carga del
+                  back-off es fija: no depende de lo que salga el top.
+                </Text>
+                <View style={styles.fields}>
+                  <Field label="Sets" value={bSets} onChange={setBSets} auto="—" />
+                  <Field label="Reps" value={bReps} onChange={setBReps} auto="—" />
+                  <Field label="CARGA (% o KG)" value={bLoad} onChange={setBLoad} auto="—" />
+                </View>
+              </>
+            ) : null}
+
+            {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+          </ScrollView>
+
+          <View style={styles.sheetFooter}>
+            <Pressable
+              onPress={() => {
+                setSets('');
+                setLoad('');
+                setRepLo('');
+                setRepHi('');
+                setRir('');
+                setBSets('');
+                setBReps('');
+                setBLoad('');
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.secondaryText}>Todo automático</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => void save()}
+              disabled={busy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.primary,
+                busy && { opacity: 0.4 },
+                pressed && !busy && { backgroundColor: palette.accentEdge },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={color.onAccent} />
+              ) : (
+                <Text style={styles.primaryText}>GUARDAR</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -549,6 +553,8 @@ const styles = StyleSheet.create({
   /** Marca de "esto lo puse yo". Un punto, no un color: el color ya lo usa la
    *  semana en curso y dos significados en el mismo canal se confunden. */
   pin: { width: 4, height: 4, borderRadius: 2, backgroundColor: color.accent },
+
+  lift: { flex: 1 },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)' },
   sheet: {

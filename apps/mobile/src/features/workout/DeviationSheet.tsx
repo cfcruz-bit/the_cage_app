@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { color, palette, radius, space } from '@/theme/tokens';
 import { Unit, formatNumber, parseWeightInput } from '@/lib/units';
 
@@ -57,93 +57,97 @@ export function DeviationSheet({ target, unit, onSave, onReset, onClose }: Props
 
   return (
     <Modal visible={target != null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+      {/* Sube con el teclado: sin esto, en Android tapa el campo que se escribe. */}
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
 
-      <View style={styles.sheet}>
-        <View style={styles.grabber} />
+        <View style={styles.sheet}>
+          <View style={styles.grabber} />
 
-        <View style={styles.body}>
-          <Text style={styles.title}>¿Qué pasó?</Text>
-          <Text style={styles.subject}>
-            {target?.exerciseName} · set {(target?.index ?? 0) + 1}
-          </Text>
-
-          <View style={styles.prescribed}>
-            <Text style={styles.prescribedLabel}>Tu coach pautó</Text>
-            <Text style={styles.prescribedValue}>
-              {target === null
-                ? ''
-                : target.targetWeightKg === null
-                  ? 'Sin carga pautada — registra lo que usaste'
-                  : `${formatNumber(target.targetWeightKg, unit)} ${unit} × ${target.targetReps}`}
+          <View style={styles.body}>
+            <Text style={styles.title}>¿Qué pasó?</Text>
+            <Text style={styles.subject}>
+              {target?.exerciseName} · set {(target?.index ?? 0) + 1}
             </Text>
+
+            <View style={styles.prescribed}>
+              <Text style={styles.prescribedLabel}>Tu coach pautó</Text>
+              <Text style={styles.prescribedValue}>
+                {target === null
+                  ? ''
+                  : target.targetWeightKg === null
+                    ? 'Sin carga pautada — registra lo que usaste'
+                    : `${formatNumber(target.targetWeightKg, unit)} ${unit} × ${target.targetReps}`}
+              </Text>
+            </View>
+
+            <Text style={styles.fieldLabel}>Repeticiones que conseguiste</Text>
+            <View style={styles.stepper}>
+              <Pressable
+                onPress={() => setReps((r) => Math.max(0, r - 1))}
+                accessibilityRole="button"
+                accessibilityLabel="Una repetición menos"
+                style={({ pressed }) => [styles.step, pressed && styles.pressed]}
+              >
+                <Text style={styles.stepText}>−</Text>
+              </Pressable>
+              <Text style={styles.reps}>{reps}</Text>
+              <Pressable
+                onPress={() => setReps((r) => Math.min(100, r + 1))}
+                accessibilityRole="button"
+                accessibilityLabel="Una repetición más"
+                style={({ pressed }) => [styles.step, pressed && styles.pressed]}
+              >
+                <Text style={styles.stepText}>+</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.fieldLabel}>Peso que usaste ({unit})</Text>
+            <TextInput
+              value={weightText}
+              onChangeText={(t) => {
+                setWeightText(t);
+                setError(false);
+              }}
+              keyboardType="decimal-pad"
+              inputMode="decimal"
+              returnKeyType="done"
+              accessibilityLabel={`Peso usado en ${unit}`}
+              style={[styles.input, error && styles.inputError]}
+            />
+            {error ? (
+              <Text style={styles.error}>
+                Escribe un peso válido y al menos una repetición.
+              </Text>
+            ) : null}
           </View>
 
-          <Text style={styles.fieldLabel}>Repeticiones que conseguiste</Text>
-          <View style={styles.stepper}>
+          <View style={styles.actions}>
             <Pressable
-              onPress={() => setReps((r) => Math.max(0, r - 1))}
+              onPress={onReset}
               accessibilityRole="button"
-              accessibilityLabel="Una repetición menos"
-              style={({ pressed }) => [styles.step, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
             >
-              <Text style={styles.stepText}>−</Text>
+              <Text style={styles.secondaryText}>
+                {target?.targetWeightKg === null ? 'Cancelar' : 'Lo hice tal cual'}
+              </Text>
             </Pressable>
-            <Text style={styles.reps}>{reps}</Text>
             <Pressable
-              onPress={() => setReps((r) => Math.min(100, r + 1))}
+              onPress={save}
               accessibilityRole="button"
-              accessibilityLabel="Una repetición más"
-              style={({ pressed }) => [styles.step, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
             >
-              <Text style={styles.stepText}>+</Text>
+              <Text style={styles.primaryText}>Guardar</Text>
             </Pressable>
           </View>
-
-          <Text style={styles.fieldLabel}>Peso que usaste ({unit})</Text>
-          <TextInput
-            value={weightText}
-            onChangeText={(t) => {
-              setWeightText(t);
-              setError(false);
-            }}
-            keyboardType="decimal-pad"
-            inputMode="decimal"
-            returnKeyType="done"
-            accessibilityLabel={`Peso usado en ${unit}`}
-            style={[styles.input, error && styles.inputError]}
-          />
-          {error ? (
-            <Text style={styles.error}>
-              Escribe un peso válido y al menos una repetición.
-            </Text>
-          ) : null}
         </View>
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={onReset}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
-          >
-            <Text style={styles.secondaryText}>
-              {target?.targetWeightKg === null ? 'Cancelar' : 'Lo hice tal cual'}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={save}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
-          >
-            <Text style={styles.primaryText}>Guardar</Text>
-          </Pressable>
-        </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  lift: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(10,10,10,0.72)' },
   sheet: {
     backgroundColor: color.bgRaised,
