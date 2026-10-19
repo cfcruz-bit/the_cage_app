@@ -37,6 +37,7 @@ import type {
   MesocycleSummaryOut,
   UserOut,
 } from '@/api/types';
+import { muscleLabel } from '@/lib/muscles';
 import { Screen } from '@/components/Screen';
 import { NewMesoSheet } from '@/features/mesos/NewMesoSheet';
 import { PlanGrid } from '@/features/mesos/PlanGrid';
@@ -345,7 +346,7 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
         {projections.map(({ id, name, muscle, weeks }) => (
           <View key={id} style={styles.card}>
             <Text style={styles.name}>{name}</Text>
-            <Text style={styles.muscle}>{muscle}</Text>
+            <Text style={styles.muscle}>{muscleLabel(muscle)}</Text>
 
             {weeks.length === 0 ? (
               <Text style={styles.footnote}>
