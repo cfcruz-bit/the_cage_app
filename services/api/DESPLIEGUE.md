@@ -153,10 +153,24 @@ script usa el mismo validador que la API y avisa antes de escribir nada.
 
 ## Lo que NO está resuelto
 
-- **Copias de seguridad.** Fly hace snapshots diarios de Postgres, pero nadie
-  ha probado restaurar uno. Una copia que no se ha restaurado nunca no es una
-  copia de seguridad; es una esperanza. Vale la pena hacer ese ensayo antes de
-  tener clientes de verdad dentro.
+- **Copias de seguridad.** La base no es la de Fly: vive en **Neon**
+  (proyecto `THE CAGE`, `aws-us-east-2`, plan gratuito). No hay snapshots
+  diarios; lo que hay es la restauracion a un momento pasado de Neon, y en el
+  plan gratuito solo llega **6 horas** atras. Un borrado que se note al dia
+  siguiente no tiene vuelta.
+
+  El ensayo se hizo el 2026-10-19 y funciona: una rama de solo lectura creada
+  desde una hora antes tenia todas las tablas, con los conteos de ese momento.
+  Para repetirlo:
+
+  ```powershell
+  neonctl branches create --project-id lingering-field-83701745 --name ensayo --parent 2026-10-19T12:00:00Z --type read_only
+  neonctl branches delete ensayo --project-id lingering-field-83701745
+  ```
+
+  Falta una copia que dure mas de 6 horas: o el plan de pago de Neon (amplia
+  la ventana a dias) o un volcado diario guardado fuera, en un sitio privado.
+  El repositorio es publico, asi que nunca como artefacto de GitHub Actions.
 - **Errores en producción.** Hoy solo están en `fly logs`, que se rotan. Sentry
   u otro agregador es el siguiente paso cuando haya gente usándolo.
 - **Dominio propio.** `the-cage-api.fly.dev` funciona. Un `api.thecage.ni` se
