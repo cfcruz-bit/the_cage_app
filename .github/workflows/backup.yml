@@ -1,0 +1,55 @@
+# Copia diaria de la base de produccion.
+#
+# Neon, en el plan gratuito, solo deja volver 6 horas atras. Esto guarda cada
+# noche un volcado completo en un bucket PRIVADO de Tigris (el almacenamiento de
+# Fly). El repositorio es publico, asi que el volcado nunca toca GitHub: ni
+# como artefacto ni en los logs. Las cuatro credenciales son secretos del repo.
+#
+# Restaurar en una base vacia:
+#   aws s3 cp s3://<bucket>/AAAA/MM/AAAA-MM-DD.sql.gz - | gunzip | psql "<url>"
+
+name: Copia de la base
+
+on:
+  schedule:
+    # 07:17 UTC = 01:17 en Nicaragua, con el gimnasio cerrado. Minuto raro a
+    # proposito: en la hora en punto GitHub retrasa los cron por la cola.
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: copia-de-la-base
+  cancel-in-progress: false
+
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # pg_dump tiene que ser de la misma version mayor que el servidor (18).
+      # La imagen oficial la fija; el cliente del runner va por detras.
+      - name: Volcado
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          docker run --rm -e DATABASE_URL postgres:18-alpine \
+            sh -c 'pg_dump --no-owner --no-privileges "$DATABASE_URL"' | gzip -9 > copia.sql.gz
+          # Un volcado vacio o a medias tambien "sale bien": se comprueba que
+          # trae las tablas antes de darlo por bueno.
+          tablas=$(gzip -dc copia.sql.gz | grep -c '^CREATE TABLE' || true)
+          echo "Tablas en el volcado: $tablas"
+          test "$tablas" -ge 10
+
+      - name: Subida
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SECRET_ACCESS_KEY }}
+          AWS_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://fly.storage.tigris.dev
+          BUCKET: ${{ secrets.BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          destino="s3://$BUCKET/$(date -u +%Y/%m/%Y-%m-%d).sql.gz"
+          aws s3 cp copia.sql.gz "$destino" --only-show-errors
+          aws s3 ls "$destino"
