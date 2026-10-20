@@ -75,6 +75,21 @@ async def _nueva_sesion(client: AsyncClient, e: dict, semana: int = 1) -> dict:
 
 
 @pytest.mark.asyncio
+async def test_abrir_una_semana_la_marca_como_la_semana_en_curso(
+    client: AsyncClient, entorno: dict
+) -> None:
+    url = f"/api/v1/mesocycles/{entorno['meso']['id']}"
+    assert (await client.get(url, headers=entorno["aa"])).json()["currentWeekIndex"] == 0
+
+    await _nueva_sesion(client, entorno, semana=3)
+    assert (await client.get(url, headers=entorno["aa"])).json()["currentWeekIndex"] == 2
+
+    # Rehacer una semana anterior no hace retroceder el bloque.
+    await _nueva_sesion(client, entorno, semana=2)
+    assert (await client.get(url, headers=entorno["aa"])).json()["currentWeekIndex"] == 2
+
+
+@pytest.mark.asyncio
 async def test_la_primera_sesion_arranca_donde_dijo_el_coach(
     client: AsyncClient, entorno: dict
 ) -> None:

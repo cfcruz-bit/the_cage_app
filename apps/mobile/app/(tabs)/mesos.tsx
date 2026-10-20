@@ -194,11 +194,13 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
   const unit = useSession((s) => s.unit);
 
   /**
-   * El coach alterna entre previsión y plan; el atleta solo ve la previsión.
+   * El coach alterna entre previsión y plan; el atleta ve el plan, en solo
+   * lectura.
    *
    * Son dos cosas distintas y por eso no se mezclan en una pantalla: la
    * previsión responde "¿hacia dónde va esto?", el plan responde "¿qué hago yo
-   * con ello?". Y pautar no es asunto del atleta.
+   * con ello?". Antes el atleta veía la previsión, y para un básico pautado eso
+   * le enseñaba cargas que su coach no había puesto.
    */
   const [tab, setTab] = useState<'proyeccion' | 'plan'>('proyeccion');
   const isCoach = onBack !== null;
@@ -335,9 +337,19 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
           </View>
         ) : null}
 
+        {isCoach ? null : (
+          <>
+            <PlanGrid mesocycleId={id} readOnly />
+            <Text style={styles.footnote}>
+              Tu coach programa este bloque. El motor ajusta la carga con el RIR y el
+              feedback que reportes cada día.
+            </Text>
+          </>
+        )}
+
         {isCoach && tab === 'plan' ? <PlanGrid mesocycleId={id} /> : null}
 
-        {isCoach && tab === 'plan' ? null : (
+        {isCoach && tab === 'proyeccion' ? (
           <>
         <VolumeChart weeks={weeklyVolume} currentIndex={current} />
 
@@ -391,12 +403,10 @@ function MesoDetail({ id, onBack }: { id: string; onBack: (() => void) | null })
         ))}
 
         <Text style={styles.footnote}>
-          {onBack === null
-            ? 'Tu coach programa este bloque. El motor ajusta la carga con el RIR y el feedback que reportes cada día.'
-            : 'Previsión del motor con feedback neutro. Para fijar números a mano, usa Pautar.'}
+          Previsión del motor con feedback neutro. Para fijar números a mano, usa Pautar.
         </Text>
           </>
-        )}
+        ) : null}
       </ScrollView>
     </Screen>
   );

@@ -161,6 +161,10 @@ async def generate_session(
         started_at=datetime.now(UTC),
     )
     session.add(ts)
+    # La semana en curso es la mas alta que ya se abrio. Nada mas la movia: se
+    # quedaba en la 1 todo el bloque, y el coach y el atleta veian "semana 1"
+    # con medio bloque hecho.
+    meso.current_week_index = max(meso.current_week_index, week_number - 1)
     await session.flush()
 
     found_mex = await session.execute(

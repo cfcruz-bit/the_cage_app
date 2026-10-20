@@ -65,7 +65,17 @@ function trimPct(v: number): string {
   return String(Math.round(v * 10) / 10);
 }
 
-export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
+/**
+ * `readOnly` es la vista del atleta: lo mismo que pautó su coach, semana a
+ * semana, sin poder tocar ninguna celda.
+ */
+export function PlanGrid({
+  mesocycleId,
+  readOnly = false,
+}: {
+  mesocycleId: string;
+  readOnly?: boolean;
+}) {
   const remote = useRemote<PlanGridOut>(
     useCallback(() => planGrid(mesocycleId), [mesocycleId]),
     [mesocycleId],
@@ -111,8 +121,9 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.hint}>
-        Cada celda es lo que propone el motor. Toca una para pautarla a mano; lo
-        que no toques lo sigue ajustando él con el feedback del atleta.
+        {readOnly
+          ? 'Lo que pautó tu coach para cada semana. Lo que no fijó a mano lo ajusta el motor con tu feedback.'
+          : 'Cada celda es lo que propone el motor. Toca una para pautarla a mano; lo que no toques lo sigue ajustando él con el feedback del atleta.'}
       </Text>
 
       {groupByDay(grid.rows).map((group) => (
@@ -147,9 +158,14 @@ export function PlanGrid({ mesocycleId }: { mesocycleId: string }) {
                 return (
                   <Pressable
                     key={cell.weekNumber}
-                    onPress={() => setEditing({ row, cell })}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Pautar ${row.name}, semana ${cell.weekNumber}`}
+                    onPress={readOnly ? undefined : () => setEditing({ row, cell })}
+                    disabled={readOnly}
+                    accessibilityRole={readOnly ? undefined : 'button'}
+                    accessibilityLabel={
+                      readOnly
+                        ? `${row.name}, semana ${cell.weekNumber}`
+                        : `Pautar ${row.name}, semana ${cell.weekNumber}`
+                    }
                     style={({ pressed }) => [
                       styles.week,
                       cell.isDeload && styles.rowDeload,

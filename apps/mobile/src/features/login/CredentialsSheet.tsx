@@ -27,6 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { Role } from '@/stores/app';
 import { useAuth } from '@/stores/auth';
+import { PasswordInput } from '@/components/PasswordInput';
 import { color, palette, radius, space } from '@/theme/tokens';
 
 /**
@@ -143,7 +144,7 @@ export function CredentialsSheet({
             accessibilityLabel="Email"
           />
 
-          <TextInput
+          <PasswordInput
             ref={passwordRef}
             style={styles.input}
             value={password}
@@ -152,7 +153,6 @@ export function CredentialsSheet({
             placeholderTextColor={color.textFaint}
             autoCapitalize="none"
             autoComplete="current-password"
-            secureTextEntry
             returnKeyType="go"
             editable={!busy}
             onSubmitEditing={() => void submit()}

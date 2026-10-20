@@ -22,7 +22,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError } from '@/api/client';
 import { changePassword } from '@/api/endpoints';
 import { useAuth } from '@/stores/auth';
+import { PasswordInput } from '@/components/PasswordInput';
 import { color, palette, space } from '@/theme/tokens';
 
 /** Mismo mínimo que exige el servidor. */
@@ -85,7 +85,7 @@ export function ChangePasswordGate() {
             de ahora solo la sabrás tú.
           </Text>
 
-          <TextInput
+          <PasswordInput
             style={styles.input}
             value={current}
             onChangeText={setCurrent}
@@ -93,11 +93,10 @@ export function ChangePasswordGate() {
             placeholderTextColor={color.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
-            secureTextEntry
             editable={!busy}
             accessibilityLabel="Contraseña provisional"
           />
-          <TextInput
+          <PasswordInput
             style={styles.input}
             value={next}
             onChangeText={setNext}
@@ -105,11 +104,10 @@ export function ChangePasswordGate() {
             placeholderTextColor={color.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
-            secureTextEntry
             editable={!busy}
             accessibilityLabel="Nueva contraseña"
           />
-          <TextInput
+          <PasswordInput
             style={styles.input}
             value={repeat}
             onChangeText={setRepeat}
@@ -117,7 +115,6 @@ export function ChangePasswordGate() {
             placeholderTextColor={color.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
-            secureTextEntry
             editable={!busy}
             onSubmitEditing={() => void submit()}
             accessibilityLabel="Repetir la nueva contraseña"
