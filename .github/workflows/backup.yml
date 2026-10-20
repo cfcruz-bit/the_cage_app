@@ -53,3 +53,31 @@ jobs:
           destino="s3://$BUCKET/$(date -u +%Y/%m/%Y-%m-%d).sql.gz"
           aws s3 cp copia.sql.gz "$destino" --only-show-errors
           aws s3 ls "$destino"
+
+      # Una copia que no se ha restaurado nunca es una esperanza. Cada noche se
+      # carga en un Postgres vacio y desechable y se comparan las filas de cada
+      # tabla con produccion. Si algo no cuadra el job sale en rojo y GitHub
+      # avisa por correo. Por el log solo pasan nombres de tabla, nunca datos
+      # ni conteos: el repo es publico.
+      - name: Prueba de restauracion
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          docker run -d --name restaurada -e POSTGRES_PASSWORD=desechable postgres:18-alpine >/dev/null
+          until docker exec restaurada pg_isready -U postgres -q; do sleep 1; done
+          gzip -dc copia.sql.gz | docker exec -i restaurada psql -U postgres -q -v ON_ERROR_STOP=1 >/dev/null
+
+          conteos='select table_name, (xpath($$/row/c/text()$$, query_to_xml(format($$select count(*) as c from public.%I$$, table_name), false, true, $$$$)))[1]::text
+                   from information_schema.tables
+                   where table_schema = $$public$$ and table_type = $$BASE TABLE$$ order by 1'
+          docker exec restaurada psql -U postgres -At -F ' ' -c "$conteos" > restaurada.txt
+          docker run --rm -e DATABASE_URL postgres:18-alpine psql "$DATABASE_URL" -At -F ' ' -c "$conteos" > produccion.txt
+
+          echo "Tablas restauradas: $(wc -l < restaurada.txt)"
+          if ! diff -q restaurada.txt produccion.txt >/dev/null; then
+            echo "No coinciden (puede ser actividad entre el volcado y la comparacion):"
+            diff restaurada.txt produccion.txt | awk '/^[<>]/ {print $2}' | sort -u
+            exit 1
+          fi
+          echo "Todas las tablas tienen las mismas filas que produccion."
