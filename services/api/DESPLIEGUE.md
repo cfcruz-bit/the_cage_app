@@ -168,9 +168,12 @@ script usa el mismo validador que la API y avisa antes de escribir nada.
   neonctl branches delete ensayo --project-id lingering-field-83701745
   ```
 
-  Falta una copia que dure mas de 6 horas: o el plan de pago de Neon (amplia
-  la ventana a dias) o un volcado diario guardado fuera, en un sitio privado.
-  El repositorio es publico, asi que nunca como artefacto de GitHub Actions.
+  Para lo que pase de 6 horas hay una copia diaria propia:
+  `.github/workflows/backup.yml` vuelca la base cada noche (01:17 en
+  Nicaragua) a un bucket privado de Tigris, `AAAA/MM/AAAA-MM-DD.sql.gz`. Se
+  lanza a mano desde la pestana Actions con "Run workflow". GitHub apaga los
+  cron de un repo publico tras 60 dias sin actividad: si el repo se queda
+  quieto, hay que reactivarlo desde esa misma pestana.
 - **Errores en producción.** Hoy solo están en `fly logs`, que se rotan. Sentry
   u otro agregador es el siguiente paso cuando haya gente usándolo.
 - **Dominio propio.** `the-cage-api.fly.dev` funciona. Un `api.thecage.ni` se
