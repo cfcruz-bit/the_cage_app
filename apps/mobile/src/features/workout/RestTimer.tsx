@@ -8,7 +8,7 @@
  */
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { color, condensed, radius, space } from '@/theme/tokens';
 import { formatRest } from '@/lib/prescription';
@@ -109,7 +109,11 @@ export function RestTimer({ seconds, runKey, onDismiss, children }: Props) {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       const remaining = seconds - elapsed;
       setLeft(remaining > 0 ? remaining : 0);
-      if (remaining <= 0) clearInterval(id);
+      if (remaining <= 0) {
+        clearInterval(id);
+        // Con la app delante la notificación puede no sonar: el aviso va en la mano.
+        Vibration.vibrate([0, 250, 120, 250]);
+      }
     }, 250);
 
     // Saltar, marcar otro set o salir de la pantalla desmonta el efecto y

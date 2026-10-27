@@ -9,6 +9,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LoadedBar } from './LoadedBar';
 import { type Unit, formatNumber } from '@/lib/units';
+import type { WarmupSet } from '@/lib/warmup';
 import { color, condensed, radius, space } from '@/theme/tokens';
 
 interface Props {
@@ -24,6 +25,12 @@ interface Props {
   rir: number | null;
   /** El ejercicio se hace con barra: tiene sentido dibujar los discos. */
   barbell: boolean;
+  /**
+   * Aproximaciones antes del primer set, y cuántas lleva hechas. Mientras
+   * falte alguna, el bloque enseña esa en vez del set de trabajo. No se guardan
+   * en ningún sitio: no son trabajo que el motor tenga que contar.
+   */
+  warmup?: { sets: WarmupSet[]; done: number; onChange: (done: number) => void };
   onDone: () => void;
   onReport: () => void;
 }
@@ -38,10 +45,79 @@ export function FocusSet({
   why,
   rir,
   barbell,
+  warmup,
   onDone,
   onReport,
 }: Props) {
   const hasTarget = targetWeightKg !== null && targetReps !== null;
+  const warm = warmup !== undefined ? warmup.sets[warmup.done] : undefined;
+
+  if (warmup !== undefined && warm !== undefined) {
+    return (
+      <View style={styles.block}>
+        <View style={styles.head}>
+          <Text style={styles.name} numberOfLines={1}>
+            {exerciseName}
+          </Text>
+          <Text style={styles.setN}>
+            Calentamiento {warmup.done + 1} de {warmup.sets.length}
+          </Text>
+        </View>
+
+        <View style={styles.warmStrip}>
+          {warmup.sets.map((w, i) => {
+            const done = i < warmup.done;
+            return (
+              <Pressable
+                key={i}
+                onPress={() => warmup.onChange(done ? i : i + 1)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: done }}
+                accessibilityLabel={`Aproximación ${formatNumber(w.kg, unit)} por ${w.reps}`}
+                style={({ pressed }) => [
+                  styles.warmChip,
+                  done && styles.warmChipDone,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.warmText, done && styles.warmTextDone]}>
+                  {i === 0 ? 'Barra' : formatNumber(w.kg, unit)} × {w.reps}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.load}>
+          <Text style={styles.num}>{formatNumber(warm.kg, unit)}</Text>
+          <Text style={styles.unit}>
+            {unit} × {warm.reps}
+          </Text>
+          <Text style={styles.rir}>aproximación</Text>
+        </View>
+
+        {unit === 'kg' ? <LoadedBar kg={warm.kg} /> : null}
+
+        <View style={styles.actions}>
+          <Pressable
+            onPress={() => warmup.onChange(warmup.done + 1)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.done, pressed && styles.pressed]}
+          >
+            <Text style={styles.doneText}>Calentamiento hecho</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => warmup.onChange(warmup.sets.length)}
+            accessibilityRole="button"
+            accessibilityLabel="Saltar el calentamiento"
+            style={({ pressed }) => [styles.cant, pressed && styles.pressed]}
+          >
+            <Text style={styles.cantText}>Saltar</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.block}>
@@ -136,4 +212,16 @@ const styles = StyleSheet.create({
   cant: { minHeight: 48, justifyContent: 'center', paddingHorizontal: space.md },
   cantText: { color: color.bone, fontSize: 14 },
   pressed: { opacity: 0.7 },
+  warmStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  warmChip: {
+    minHeight: 36,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: color.boneEdge,
+    borderRadius: radius.chip,
+  },
+  warmChipDone: { backgroundColor: color.bone, borderColor: color.bone },
+  warmText: { color: color.bone, fontSize: 13.5, fontVariant: ['tabular-nums'] },
+  warmTextDone: { color: color.onBone },
 });

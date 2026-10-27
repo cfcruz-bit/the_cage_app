@@ -119,6 +119,8 @@ export const color = {
   /** Hueso: el botón principal sobre el rojo profundo. Claro en los dos temas. */
   bone: palette.a100,
   onBone: '#0a0a0a',
+  /** Borde hueso a media opacidad: lo que se puede tocar sobre el rojo profundo. */
+  boneEdge: 'rgba(247,244,236,0.35)',
   /** El check de un set hecho: hueso sobre oscuro, gris casi negro sobre claro. */
   done: scheme === 'light' ? '#2e2e2b' : palette.a100,
   onDone: scheme === 'light' ? '#f7f4ec' : '#0a0a0a',

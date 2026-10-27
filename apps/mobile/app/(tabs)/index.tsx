@@ -23,15 +23,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Vibration,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { Feedback } from '@cage/engine';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import type { Soreness } from '@cage/engine';
 
 import type { SessionOut } from '@/api/types';
 import { Screen } from '@/components/Screen';
 import { DeviationSheet } from '@/features/workout/DeviationSheet';
-import { FeedbackSheet } from '@/features/feedback/FeedbackSheet';
+import { MuscleFeedback, SorenessAsk } from '@/features/feedback/MuscleFeedback';
 import { FocusSet } from '@/features/workout/FocusSet';
 import { LoadedBar } from '@/features/workout/LoadedBar';
 import { RestTimer } from '@/features/workout/RestTimer';
@@ -39,13 +41,19 @@ import { SessionExerciseCard } from '@/features/workout/SessionExerciseCard';
 import { GenerateSessionSheet } from '@/features/workout/GenerateSessionSheet';
 import { type HistoryTarget, HistorySheet } from '@/features/workout/HistorySheet';
 import { nextUpText } from '@/lib/days';
+import { muscleLabel } from '@/lib/muscles';
 import { joinParts, techniqueOf } from '@/lib/technique';
+import { warmupSets } from '@/lib/warmup';
 import { useApp } from '@/stores/app';
 import { useSession } from '@/stores/session';
 import { useSync } from '@/stores/sync';
 import { resolveSet, useWorkout } from '@/stores/workout';
 import { color, condensed, radius, space } from '@/theme/tokens';
 import { formatLoad, formatNumber } from '@/lib/units';
+
+const KEEP_AWAKE_TAG = 'sesion';
+/** Un toque corto: confirma el set sin que haga falta mirar la pantalla. */
+const TAP_MS = 30;
 
 export default function WorkoutScreen() {
   const isCoach = useApp((s) => s.role) === 'coach';
@@ -68,7 +76,8 @@ export default function WorkoutScreen() {
   const pending = useSync((s) => s.pending);
 
   const [rest, setRest] = useState<{ seconds: number; key: string } | null>(null);
-  const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
+  /** Agujetas contestadas al empezar cada músculo, por grupo. Solo de esta sesión. */
+  const [soreness, setSoreness] = useState<Record<string, Soreness>>({});
   const [deviation, setDeviation] = useState<{
     exerciseId: string;
     index: number;
@@ -77,10 +86,23 @@ export default function WorkoutScreen() {
   const [historyFor, setHistoryFor] = useState<HistoryTarget | null>(null);
   /** Ejercicio con el panel de la técnica de su último set abierto. */
   const [techniqueFor, setTechniqueFor] = useState<string | null>(null);
+  /** Aproximaciones hechas por ejercicio. Solo en memoria: no son trabajo que contar. */
+  const [warmDone, setWarmDone] = useState<Record<string, number>>({});
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Entre series el móvil está en el suelo: con una sesión abierta la pantalla
+  // no se apaga. Solo en esta pestaña; al salir de ella vuelve a lo normal.
+  const sessionOpen = session !== null;
+  useEffect(() => {
+    if (!sessionOpen) return;
+    activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => {});
+    return () => {
+      deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => {});
+    };
+  }, [sessionOpen]);
 
   /** El plan del servidor con las marcas locales encima. */
   const resolved = useMemo(() => {
@@ -133,6 +155,7 @@ export default function WorkoutScreen() {
     (exerciseId: string, restSeconds: number) =>
       (index: number, targetWeightKg: number, targetReps: number) => {
         void toggleSet(exerciseId, index, targetWeightKg, targetReps);
+        Vibration.vibrate(TAP_MS);
         setRest({ seconds: restSeconds, key: `${exerciseId}:${index}` });
       },
     [toggleSet],
@@ -241,7 +264,17 @@ export default function WorkoutScreen() {
     );
   }
 
-  const active = resolved.find((r) => r.exercise.id === feedbackFor);
+  // El feedback va por músculo (el grupo del catálogo): el primer ejercicio de
+  // cada uno pregunta las agujetas y, con todo el grupo hecho, una tarjeta tras
+  // el último pregunta el pump, la carga y las articulaciones.
+  const groups = new Map<string, typeof resolved>();
+  for (const r of resolved) {
+    const g = groups.get(r.exercise.muscle);
+    if (g === undefined) groups.set(r.exercise.muscle, [r]);
+    else g.push(r);
+  }
+  const groupFeedback = (muscle: string) =>
+    (groups.get(muscle) ?? []).every((r) => feedbackDone[r.exercise.id] === true);
 
   // El RIR va en la cabecera solo si es el mismo en todo el día; si el coach
   // pautó RIR distintos, cada ejercicio ya lo lleva en su línea.
@@ -364,6 +397,19 @@ export default function WorkoutScreen() {
           why={focus.set.why || focus.exercise.why}
           rir={focus.exercise.targetRir ?? null}
           barbell={focus.barbell}
+          warmup={
+            // Solo antes del primer set de un ejercicio con barra y peso pautado.
+            focus.barbell && focus.set.index === 0 && focus.set.targetWeightKg !== null
+              ? {
+                  sets: warmupSets(focus.set.targetWeightKg),
+                  done: warmDone[focus.exercise.id] ?? 0,
+                  onChange: (done) => {
+                    setWarmDone((w) => ({ ...w, [focus.exercise.id]: done }));
+                    Vibration.vibrate(TAP_MS);
+                  },
+                }
+              : undefined
+          }
           onDone={() => {
             const { targetWeightKg, targetReps } = focus.set;
             if (targetWeightKg === null || targetReps === null) return;
@@ -395,93 +441,113 @@ export default function WorkoutScreen() {
           />
         }
       >
-        {resolved.map(({ exercise, sets }) => (
-          <View
-            key={exercise.id}
-            onLayout={(e) => {
-              const y = e.nativeEvent.layout.y;
-              const prev = cardY.current[exercise.id];
-              cardY.current[exercise.id] = y;
-              // La tarjeta en curso se mueve al abrir la sesión a medias y cuando
-              // la de arriba crece con su fila de feedback: en ambos casos se sigue.
-              if (exercise.id === focusId && prev !== y) scrollToCard(y, prev !== undefined);
-            }}
-          >
-            <SessionExerciseCard
-              exercise={exercise}
-              sets={sets}
-              unit={unit}
-              feedbackSaved={feedbackDone[exercise.id] === true}
-              nextPendingIndex={
-                summary.firstPending?.exerciseId === exercise.id
-                  ? summary.firstPending.index
-                  : null
-              }
-              onToggle={(index) => {
-                const s = sets.find((x) => x.index === index);
-                // Sin objetivo no hay nada que asumir al tocar el check: ese
-                // caso lo resuelve SetRow abriendo el reporte, no este callback.
-                if (s === undefined || s.targetWeightKg === null || s.targetReps === null) {
-                  return;
+        {resolved.map(({ exercise, sets }) => {
+          const group = groups.get(exercise.muscle) ?? [];
+          const firstOfGroup = group[0]?.exercise.id === exercise.id;
+          const lastOfGroup = group[group.length - 1]?.exercise.id === exercise.id;
+          const groupDone = group.every((r) => r.sets.every((x) => x.done));
+          const feedbackGiven = groupFeedback(exercise.muscle);
+          return (
+            <View
+              key={exercise.id}
+              onLayout={(e) => {
+                const y = e.nativeEvent.layout.y;
+                const prev = cardY.current[exercise.id];
+                cardY.current[exercise.id] = y;
+                // La tarjeta en curso se mueve al abrir la sesión a medias y cuando
+                // la de arriba crece con su fila de feedback: en ambos casos se sigue.
+                if (exercise.id === focusId && prev !== y) scrollToCard(y, prev !== undefined);
+              }}
+            >
+              <SessionExerciseCard
+                exercise={exercise}
+                sets={sets}
+                unit={unit}
+                prelude={
+                  firstOfGroup && !feedbackGiven ? (
+                    <SorenessAsk
+                      muscle={muscleLabel(exercise.muscle)}
+                      value={soreness[exercise.muscle] ?? null}
+                      onChange={(v) => setSoreness((x) => ({ ...x, [exercise.muscle]: v }))}
+                    />
+                  ) : undefined
                 }
-                onToggle(exercise.id, exercise.restSeconds)(
-                  index,
-                  s.targetWeightKg,
-                  s.targetReps,
-                );
-              }}
-              onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
-              onFeedback={() => setFeedbackFor(exercise.id)}
-              techniqueOpen={techniqueFor === exercise.id}
-              onTechnique={() =>
-                setTechniqueFor((open) => (open === exercise.id ? null : exercise.id))
-              }
-              onTechniqueSave={(parts) => {
-                const last = sets[sets.length - 1];
-                if (last === undefined) return;
-                const { reps, subSets } = joinParts(parts);
-                void reportSet(exercise.id, last.index, {
-                  weightKg: last.targetWeightKg,
-                  reps,
-                  rpe: null,
-                  subSets,
-                });
-                setTechniqueFor(null);
-                setRest({ seconds: exercise.restSeconds, key: `${exercise.id}:${last.index}` });
-              }}
-              onHistory={() =>
-                setHistoryFor({
-                  sessionId: session.id,
-                  sessionExerciseId: exercise.id,
-                  name: exercise.name,
-                })
-              }
-            />
-          </View>
-        ))}
+                nextPendingIndex={
+                  summary.firstPending?.exerciseId === exercise.id
+                    ? summary.firstPending.index
+                    : null
+                }
+                onToggle={(index) => {
+                  const s = sets.find((x) => x.index === index);
+                  // Sin objetivo no hay nada que asumir al tocar el check: ese
+                  // caso lo resuelve SetRow abriendo el reporte, no este callback.
+                  if (s === undefined || s.targetWeightKg === null || s.targetReps === null) {
+                    return;
+                  }
+                  onToggle(exercise.id, exercise.restSeconds)(
+                    index,
+                    s.targetWeightKg,
+                    s.targetReps,
+                  );
+                }}
+                onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
+                techniqueOpen={techniqueFor === exercise.id}
+                onTechnique={() =>
+                  setTechniqueFor((open) => (open === exercise.id ? null : exercise.id))
+                }
+                onTechniqueSave={(parts) => {
+                  const last = sets[sets.length - 1];
+                  if (last === undefined) return;
+                  const { reps, subSets } = joinParts(parts);
+                  void reportSet(exercise.id, last.index, {
+                    weightKg: last.targetWeightKg,
+                    reps,
+                    rpe: null,
+                    subSets,
+                  });
+                  setTechniqueFor(null);
+                  Vibration.vibrate(TAP_MS);
+                  setRest({ seconds: exercise.restSeconds, key: `${exercise.id}:${last.index}` });
+                }}
+                onHistory={() =>
+                  setHistoryFor({
+                    sessionId: session.id,
+                    sessionExerciseId: exercise.id,
+                    name: exercise.name,
+                  })
+                }
+              />
+
+              {lastOfGroup && groupDone && !feedbackGiven ? (
+                <MuscleFeedback
+                  muscle={muscleLabel(exercise.muscle)}
+                  exercises={group.map((r) => ({
+                    id: r.exercise.id,
+                    name: r.exercise.name,
+                    exercise: r.exercise.exercise,
+                  }))}
+                  soreness={soreness[exercise.muscle] ?? null}
+                  unit={unit}
+                  aggressiveness="Media"
+                  onSave={(byExercise) => {
+                    for (const [id, fb] of Object.entries(byExercise)) void saveFeedback(id, fb);
+                  }}
+                />
+              ) : null}
+            </View>
+          );
+        })}
 
         {summary.total > 0 && summary.done === summary.total ? (
           <SessionDone
-            items={resolved.map((r) => ({
-              id: r.exercise.id,
-              name: r.exercise.name,
-              feedback: feedbackDone[r.exercise.id] === true,
+            items={[...groups.keys()].map((muscle) => ({
+              id: muscle,
+              name: muscleLabel(muscle),
+              feedback: groupFeedback(muscle),
             }))}
-            onFeedback={setFeedbackFor}
           />
         ) : null}
       </ScrollView>
-
-      <FeedbackSheet
-        exercise={active?.exercise.exercise ?? null}
-        unit={unit}
-        aggressiveness="Media"
-        onSave={(feedback: Feedback) => {
-          if (feedbackFor !== null) void saveFeedback(feedbackFor, feedback);
-          setFeedbackFor(null);
-        }}
-        onClose={() => setFeedbackFor(null)}
-      />
 
       <HistorySheet target={historyFor} unit={unit} onClose={() => setHistoryFor(null)} />
 
@@ -508,16 +574,10 @@ export default function WorkoutScreen() {
 /**
  * Lo que se ve al terminar. Terminar el entreno es lo que hace que cuente.
  *
- * Lista los ejercicios con su feedback: el que falta se da desde aquí mismo, y
- * sin él el motor no ajusta ese ejercicio la semana que viene.
+ * Lista los músculos con su feedback. El que falta se da en su tarjeta, arriba
+ * en la lista, y sin él el motor no ajusta ese músculo la semana que viene.
  */
-function SessionDone({
-  items,
-  onFeedback,
-}: {
-  items: { id: string; name: string; feedback: boolean }[];
-  onFeedback: (exerciseId: string) => void;
-}) {
+function SessionDone({ items }: { items: { id: string; name: string; feedback: boolean }[] }) {
   const complete = useWorkout((s) => s.complete);
   const load = useWorkout((s) => s.load);
   const [closing, setClosing] = useState(false);
@@ -527,25 +587,19 @@ function SessionDone({
     <View style={styles.doneBanner}>
       <Text style={styles.doneTitle}>Entreno completo</Text>
       {items.map((i) => (
-        <Pressable
-          key={i.id}
-          onPress={() => onFeedback(i.id)}
-          disabled={i.feedback}
-          accessibilityRole="button"
-          accessibilityLabel={i.feedback ? `${i.name}: feedback dado` : `Dar feedback de ${i.name}`}
-          style={({ pressed }) => [styles.doneRow, pressed && { opacity: 0.7 }]}
-        >
+        <View key={i.id} style={styles.doneRow}>
           <Text style={styles.doneName} numberOfLines={1}>
             {i.name}
           </Text>
           <Text style={[styles.doneState, !i.feedback && styles.doneMissing]}>
-            {i.feedback ? 'feedback dado' : 'dar feedback'}
+            {i.feedback ? 'feedback dado' : 'falta el feedback'}
           </Text>
-        </Pressable>
+        </View>
       ))}
       {missing ? (
         <Text style={styles.doneText}>
-          Sin feedback, el motor no ajusta ese ejercicio la semana que viene.
+          Sin feedback, el motor no ajusta ese músculo la semana que viene. Lo das en
+          su tarjeta, arriba.
         </Text>
       ) : null}
       <Pressable
@@ -643,7 +697,7 @@ const styles = StyleSheet.create({
   },
   doneName: { flex: 1, color: color.bone, fontSize: 14 },
   doneState: { color: color.bone, opacity: 0.75, fontSize: 13 },
-  doneMissing: { opacity: 1, fontWeight: '600', textDecorationLine: 'underline' },
+  doneMissing: { opacity: 1, fontWeight: '600' },
   doneText: { color: color.bone, opacity: 0.85, fontSize: 13, lineHeight: 18 },
   finish: {
     backgroundColor: color.bone,

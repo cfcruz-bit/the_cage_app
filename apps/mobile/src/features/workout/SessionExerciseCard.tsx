@@ -11,7 +11,7 @@
  * la semana que viene.
  */
 
-import { memo } from 'react';
+import { type ReactNode, memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -40,12 +40,12 @@ interface Props {
   exercise: SessionExerciseOut;
   sets: ResolvedSet[];
   unit: Unit;
-  feedbackSaved: boolean;
+  /** Lo que va antes de la tabla: la pregunta de agujetas al empezar un músculo. */
+  prelude?: ReactNode;
   /** Índice del próximo set pendiente en este ejercicio, o null. */
   nextPendingIndex: number | null;
   onToggle: (index: number) => void;
   onReport: (index: number) => void;
-  onFeedback: () => void;
   onHistory: () => void;
   /** El panel de la técnica del último set está abierto. */
   techniqueOpen: boolean;
@@ -69,11 +69,10 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   exercise,
   sets,
   unit,
-  feedbackSaved,
+  prelude,
   nextPendingIndex,
   onToggle,
   onReport,
-  onFeedback,
   onHistory,
   techniqueOpen,
   onTechnique,
@@ -162,6 +161,8 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             <Text style={styles.techText}>{techniqueText(plan, chain, unit)}</Text>
           </View>
         ) : null}
+
+        {prelude}
       </View>
 
       <View style={styles.tableHead}>
@@ -208,30 +209,6 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
         );
       })}
 
-      {allDone ? (
-        <Pressable
-          onPress={onFeedback}
-          disabled={feedbackSaved}
-          accessibilityRole="button"
-          accessibilityLabel={`Feedback de ${exercise.name}`}
-          style={({ pressed }) => [
-            styles.feedback,
-            feedbackSaved && styles.feedbackDone,
-            pressed && !feedbackSaved && { opacity: 0.7 },
-          ]}
-        >
-          <Ionicons
-            name={feedbackSaved ? 'checkmark-circle' : 'chatbubble-ellipses-outline'}
-            size={15}
-            color={feedbackSaved ? palette.n400 : color.accent}
-          />
-          <Text style={[styles.feedbackText, feedbackSaved && styles.feedbackTextDone]}>
-            {feedbackSaved
-              ? 'Feedback enviado'
-              : '¿Cómo te fue? Ajusta la semana que viene'}
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 });
@@ -297,16 +274,4 @@ const styles = StyleSheet.create({
   },
   th: { ...type.label, flex: 1, color: color.textMuted, textAlign: 'center' },
   thLog: { flex: 0, width: SET_COLUMNS.check },
-  feedback: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    marginHorizontal: space.lg,
-    paddingVertical: space.md,
-    borderTopWidth: 1,
-    borderTopColor: color.border,
-  },
-  feedbackDone: { opacity: 0.6 },
-  feedbackText: { color: color.accent, fontSize: 12.5, flex: 1 },
-  feedbackTextDone: { color: palette.n400 },
 });
