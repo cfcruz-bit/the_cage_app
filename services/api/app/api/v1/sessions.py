@@ -355,7 +355,7 @@ async def exercise_history(
                 other_block=past_ts.mesocycle_id != ts.mesocycle_id,
                 target_rir=target_rir_for(past_mex, past_ts.week_number, past_ts.is_deload),
                 sets=[
-                    HistorySetOut(weight_kg=log.weight_kg, reps=log.reps)
+                    HistorySetOut(weight_kg=log.weight_kg, reps=log.reps, sub_sets=log.sub_sets)
                     for log in sorted(past.set_logs, key=lambda log: log.idx)
                     if log.done
                 ],
@@ -412,6 +412,9 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                     equipment=mex.catalog.equipment,
                     target_rir=target_rir_for(mex, ts.week_number, ts.is_deload),
                     note=mex.note,
+                    technique=se.technique,
+                    technique_rounds=se.technique_rounds,
+                    technique_amount=se.technique_amount,
                     planned_load_kg=None,
                     planned_sets=se.planned_sets,
                     backoff_sets=se.backoff_sets,
@@ -458,6 +461,9 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                 equipment=mex.catalog.equipment,
                 target_rir=target_rir_for(mex, ts.week_number, ts.is_deload),
                 note=mex.note,
+                technique=se.technique,
+                technique_rounds=se.technique_rounds,
+                technique_amount=se.technique_amount,
                 planned_load_kg=se.planned_load_kg,
                 planned_sets=se.planned_sets,
                 backoff_sets=se.backoff_sets,
@@ -477,6 +483,7 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                         logged_reps=s.logged_reps,
                         logged_rpe=s.logged_rpe,
                         done=s.done,
+                        logged_sub_sets=s.logged_sub_sets,
                     )
                     for s in planned
                 ]
@@ -528,6 +535,7 @@ def _backoff_out(se: SessionExercise) -> list[PlannedSetOut]:
                 logged_weight_kg=log.weight_kg if log is not None else None,
                 logged_reps=log.reps if log is not None else None,
                 logged_rpe=log.rpe if log is not None else None,
+                logged_sub_sets=log.sub_sets if log is not None else None,
                 done=bool(log.done) if log is not None else False,
                 backoff=True,
             )
@@ -552,6 +560,7 @@ def _blank_sets(se: SessionExercise) -> list[PlannedSetOut]:
                 logged_weight_kg=log.weight_kg if log is not None else None,
                 logged_reps=log.reps if log is not None else None,
                 logged_rpe=log.rpe if log is not None else None,
+                logged_sub_sets=log.sub_sets if log is not None else None,
                 done=bool(log.done) if log is not None else False,
             )
         )

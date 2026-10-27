@@ -45,6 +45,8 @@ interface LocalMark {
   weightKg: number | null;
   reps: string | null;
   rpe: string | null;
+  /** Las partes tras la primera en un set con técnica: "4+3". */
+  subSets: string | null;
 }
 
 interface WorkoutState {
@@ -75,7 +77,12 @@ interface WorkoutState {
   reportSet: (
     sessionExerciseId: string,
     index: number,
-    patch: { weightKg: number | null; reps: string | null; rpe: string | null },
+    patch: {
+      weightKg: number | null;
+      reps: string | null;
+      rpe: string | null;
+      subSets?: string | null;
+    },
   ) => Promise<void>;
   saveFeedback: (sessionExerciseId: string, feedback: Feedback) => Promise<void>;
   complete: () => Promise<void>;
@@ -156,6 +163,7 @@ export const useWorkout = create<WorkoutState>((set, get) => ({
       weightKg: current?.weightKg ?? targetWeightKg,
       reps: current?.reps ?? String(targetReps),
       rpe: current?.rpe ?? null,
+      subSets: current?.subSets ?? null,
     };
 
     set({ marks: { ...get().marks, [id]: mark } });
@@ -172,6 +180,7 @@ export const useWorkout = create<WorkoutState>((set, get) => ({
       weightKg: patch.weightKg,
       reps: patch.reps,
       rpe: patch.rpe,
+      subSets: patch.subSets ?? null,
     };
     void current;
 
@@ -224,7 +233,7 @@ async function persist(
     weightKg: mark.weightKg,
     reps: mark.reps,
     rpe: mark.rpe,
-    subSets: null,
+    subSets: mark.subSets,
     done: mark.done,
     loggedAt: new Date().toISOString(),
   };
@@ -255,13 +264,24 @@ export function resolveSet(
   marks: Record<string, LocalMark>,
   sessionExerciseId: string,
   index: number,
-  fromServer: { done: boolean; loggedWeightKg: number | null; loggedReps: string | null },
-): { done: boolean; loggedWeightKg: number | null; loggedReps: string | null } {
+  fromServer: {
+    done: boolean;
+    loggedWeightKg: number | null;
+    loggedReps: string | null;
+    loggedSubSets: string | null;
+  },
+): {
+  done: boolean;
+  loggedWeightKg: number | null;
+  loggedReps: string | null;
+  loggedSubSets: string | null;
+} {
   const mark = marks[key(sessionExerciseId, index)];
   if (mark === undefined) return fromServer;
   return {
     done: mark.done,
     loggedWeightKg: mark.weightKg,
     loggedReps: mark.reps,
+    loggedSubSets: mark.subSets,
   };
 }

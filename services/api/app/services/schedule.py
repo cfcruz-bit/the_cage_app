@@ -39,6 +39,7 @@ from app.services.planning import (
     last_performance,
     resolve_backoff,
     resolve_plan,
+    resolve_technique,
     resolve_without_history,
     to_domain_exercise,
 )
@@ -202,14 +203,14 @@ async def generate_session(
         last = await last_performance(session, mex)
         mark = marks.get(mex.catalog_id)
         one_rm_kg = mark.value_kg if mark is not None else None
+        p = effective_prescription(mex, week_number)
         # Ya validado arriba: si lleva back-off, sus kilos estan resueltos.
-        backoff = resolve_backoff(
-            effective_prescription(mex, week_number), one_rm_kg, mex.load_increment_kg
-        )
+        backoff = resolve_backoff(p, one_rm_kg, mex.load_increment_kg)
         frozen_backoff = {
             "backoff_sets": backoff[0] if backoff else None,
             "backoff_reps": backoff[1] if backoff else None,
             "backoff_load_kg": backoff[2] if backoff else None,
+            **resolve_technique(p, ts.is_deload),
         }
 
         if last is None:

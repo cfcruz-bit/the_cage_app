@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, mo
 
 from app.core.security import MIN_PASSWORD_LENGTH
 from app.domain.schemas import Aggressiveness, Exercise, Feedback, MuscleGroup
-from app.models.training import TrainingGoal
+from app.models.training import Technique, TrainingGoal
 
 
 def _camel(snake: str) -> str:
@@ -152,6 +152,38 @@ class BackoffIn(ApiModel):
         return self
 
 
+#: (rondas, cantidad) admitidas por tecnica. La cantidad son segundos de pausa,
+#: % de bajada o reps por mini-serie segun la tecnica: ver `Technique`.
+TECHNIQUE_LIMITS: dict[Technique, tuple[tuple[int, int], tuple[int, int]]] = {
+    Technique.REST_PAUSE: ((1, 5), (5, 60)),
+    Technique.DROP_SET: ((1, 4), (5, 50)),
+    Technique.MYO_REPS: ((1, 6), (1, 15)),
+}
+
+
+class TechniqueIn(ApiModel):
+    """Tecnica de intensidad del ultimo set. Opcional: todo null = sin tecnica."""
+
+    technique: Technique | None = None
+    technique_rounds: int | None = None
+    technique_amount: int | None = None
+
+    @model_validator(mode="after")
+    def _tecnica_entera(self) -> TechniqueIn:
+        if self.technique is None:
+            if self.technique_rounds is not None or self.technique_amount is not None:
+                raise ValueError("Sin tecnica no hay rondas ni cantidad que fijar")
+            return self
+        if self.technique_rounds is None or self.technique_amount is None:
+            raise ValueError("La tecnica lleva rondas y cantidad")
+        (r_lo, r_hi), (a_lo, a_hi) = TECHNIQUE_LIMITS[self.technique]
+        if not r_lo <= self.technique_rounds <= r_hi:
+            raise ValueError(f"Las rondas van de {r_lo} a {r_hi}")
+        if not a_lo <= self.technique_amount <= a_hi:
+            raise ValueError(f"La cantidad va de {a_lo} a {a_hi}")
+        return self
+
+
 class WeekLoadIn(BackoffIn):
     """Una fila del paso 4 opcional: la carga de UNA semana de UN ejercicio.
 
@@ -239,7 +271,7 @@ class MesocycleDaysIn(ApiModel):
     exercises: list[DayExerciseIn] = Field(default_factory=list, max_length=40)
 
 
-class PrescriptionIn(BackoffIn):
+class PrescriptionIn(BackoffIn, TechniqueIn):
     """Lo que el coach fija a mano. null = lo decide el motor."""
 
     #: None = para todo el bloque. N = solo para la semana N.
@@ -348,6 +380,8 @@ class PlannedSetOut(ApiModel):
     done: bool
     #: True en las series que vienen detras del top set.
     backoff: bool = False
+    #: Las partes despues de la primera en un set con tecnica: "4+3".
+    logged_sub_sets: str | None = None
 
 
 class SessionExerciseOut(ApiModel):
@@ -360,6 +394,10 @@ class SessionExerciseOut(ApiModel):
     target_rir: int
     #: Nota fija del coach para el ejercicio, o null.
     note: str | None = None
+    #: Tecnica del ULTIMO set, congelada. null = sin tecnica.
+    technique: Technique | None = None
+    technique_rounds: int | None = None
+    technique_amount: int | None = None
     #: null en la primera sesion de un ejercicio sin arranque: nadie ha dado
     #: todavia un peso real. El atleta lo escribe el mismo en la sesion.
     planned_load_kg: float | None
@@ -461,6 +499,7 @@ class ExerciseNoteIn(ApiModel):
 class HistorySetOut(ApiModel):
     weight_kg: float | None
     reps: str | None
+    sub_sets: str | None = None
 
 
 class HistoryEntryOut(ApiModel):
@@ -655,6 +694,11 @@ class PlanCellOut(ApiModel):
     backoff_load_kg: float | None = None
     backoff_load_percent: float | None = None
     backoff_needs_one_rm: bool = False
+
+    #: Tecnica del ultimo set. null = sin tecnica (y siempre en el deload).
+    technique: Technique | None = None
+    technique_rounds: int | None = None
+    technique_amount: int | None = None
 
     sets_overridden: bool
     load_overridden: bool

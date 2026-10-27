@@ -17,9 +17,11 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { SessionExerciseOut } from '@/api/types';
 import { SET_COLUMNS, SetRow } from './SetRow';
+import { TechniquePanel } from './TechniquePanel';
 import { muscleLabel } from '@/lib/muscles';
 import { formatRest } from '@/lib/prescription';
-import type { Unit } from '@/lib/units';
+import { type TechniquePlan, dropWeights, techniqueOf, techniqueTag } from '@/lib/technique';
+import { type Unit, formatNumber } from '@/lib/units';
 import { color, palette, radius, space, type } from '@/theme/tokens';
 
 interface ResolvedSet {
@@ -29,6 +31,7 @@ interface ResolvedSet {
   why: string;
   loggedWeightKg: number | null;
   loggedReps: string | null;
+  loggedSubSets: string | null;
   done: boolean;
   backoff: boolean;
 }
@@ -44,6 +47,22 @@ interface Props {
   onReport: (index: number) => void;
   onFeedback: () => void;
   onHistory: () => void;
+  /** El panel de la técnica del último set está abierto. */
+  techniqueOpen: boolean;
+  onTechnique: () => void;
+  onTechniqueSave: (parts: number[]) => void;
+}
+
+/** La línea que explica la técnica, con los números de este ejercicio. */
+function techniqueText(plan: TechniquePlan, chain: string | null, unit: Unit): string {
+  switch (plan.technique) {
+    case 'drop_set':
+      return `Drop set en el último set: ${plan.rounds} ${plan.rounds === 1 ? 'bajada' : 'bajadas'} de un ${plan.amount} % sin descanso${chain ? ` (${chain} ${unit})` : ''}.`;
+    case 'rest_pause':
+      return `Rest-pause en el último set: al acabar, ${plan.amount} s de pausa y ${plan.rounds} ${plan.rounds === 1 ? 'mini-serie' : 'mini-series'} más con el mismo peso.`;
+    case 'myo_reps':
+      return `Myo-reps en el último set: ${plan.rounds} mini-series de ${plan.amount} reps con 3–5 respiraciones entre ellas.`;
+  }
 }
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -56,6 +75,9 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   onReport,
   onFeedback,
   onHistory,
+  techniqueOpen,
+  onTechnique,
+  onTechniqueSave,
 }: Props) {
   const doneCount = sets.filter((s) => s.done).length;
   const allDone = doneCount === sets.length && sets.length > 0;
@@ -68,6 +90,22 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   ]
     .filter(Boolean)
     .join(' · ');
+
+  // La técnica va siempre en el último set y solo si tiene peso pautado: sin
+  // peso no hay bajadas que calcular ni nada que repetir.
+  const plan = techniqueOf(exercise);
+  const last = sets[sets.length - 1];
+  const techSet = plan !== null && last?.targetWeightKg != null && last.targetReps != null ? last : null;
+  const drops =
+    plan?.technique === 'drop_set' && techSet !== null
+      ? dropWeights(
+          techSet.targetWeightKg as number,
+          plan.rounds,
+          plan.amount,
+          exercise.exercise?.loadIncrementKg ?? 2.5,
+        )
+      : null;
+  const chain = drops === null ? null : drops.map((w) => formatNumber(w, unit)).join(' → ');
 
   return (
     <View style={styles.card}>
@@ -117,6 +155,13 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
             <Text style={styles.whyText}>{exercise.why}</Text>
           </View>
         ) : null}
+
+        {plan !== null ? (
+          <View style={styles.why}>
+            <Ionicons name="flash-outline" size={14} color={color.tech} />
+            <Text style={styles.techText}>{techniqueText(plan, chain, unit)}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.tableHead}>
@@ -127,23 +172,41 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
         <Text style={[styles.th, styles.thLog]}>LOG</Text>
       </View>
 
-      {sets.map((s) => (
-        <SetRow
-          key={s.index}
-          index={s.index}
-          unit={unit}
-          targetWeightKg={s.targetWeightKg}
-          targetReps={s.targetReps}
-          why={s.why}
-          loggedWeightKg={s.loggedWeightKg}
-          loggedReps={s.loggedReps}
-          done={s.done}
-          isNext={nextPendingIndex === s.index}
-          kind={exercise.backoffSets == null ? undefined : s.backoff ? 'backoff' : 'top'}
-          onToggle={() => onToggle(s.index)}
-          onReport={() => onReport(s.index)}
-        />
-      ))}
+      {sets.map((s) => {
+        const isTech = plan !== null && s === techSet;
+        return (
+          <View key={s.index}>
+            <SetRow
+              index={s.index}
+              unit={unit}
+              targetWeightKg={s.targetWeightKg}
+              targetReps={s.targetReps}
+              why={s.why}
+              loggedWeightKg={s.loggedWeightKg}
+              loggedReps={s.loggedReps}
+              loggedSubSets={s.loggedSubSets}
+              done={s.done}
+              isNext={nextPendingIndex === s.index && !(isTech && techniqueOpen)}
+              kind={exercise.backoffSets == null ? undefined : s.backoff ? 'backoff' : 'top'}
+              techniqueTag={isTech ? techniqueTag(plan.technique) : undefined}
+              chain={isTech && drops !== null ? `→ ${drops.slice(1).map((w) => formatNumber(w, unit)).join(' → ')}` : undefined}
+              // Marcar el set con técnica abre sus partes; desmarcarlo es como cualquier otro.
+              onToggle={isTech && !s.done ? onTechnique : () => onToggle(s.index)}
+              onReport={() => onReport(s.index)}
+            />
+            {isTech && techniqueOpen && !s.done ? (
+              <TechniquePanel
+                plan={plan}
+                weightKg={s.targetWeightKg as number}
+                incrementKg={exercise.exercise?.loadIncrementKg ?? 2.5}
+                targetReps={s.targetReps as number}
+                unit={unit}
+                onSave={onTechniqueSave}
+              />
+            ) : null}
+          </View>
+        );
+      })}
 
       {allDone ? (
         <Pressable
@@ -223,6 +286,7 @@ const styles = StyleSheet.create({
   pinWho: { color: color.textMuted, fontSize: 11 },
   why: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   whyText: { flex: 1, color: color.textMuted, fontSize: 12.5, lineHeight: 17 },
+  techText: { flex: 1, color: palette.n400, fontSize: 12.5, lineHeight: 17 },
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',

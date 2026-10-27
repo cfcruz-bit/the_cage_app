@@ -143,6 +143,9 @@ def _to_prescription_out(
         backoff_load_kg=p.backoff_load_kg,
         backoff_load_percent=p.backoff_load_percent,
         backoff_needs_one_rm=p.backoff_load_percent is not None and mark is None,
+        technique=p.technique,
+        technique_rounds=p.technique_rounds,
+        technique_amount=p.technique_amount,
     )
 
 
@@ -591,6 +594,9 @@ async def set_prescription(
     p.backoff_reps = body.backoff_reps
     p.backoff_load_kg = body.backoff_load_kg
     p.backoff_load_percent = body.backoff_load_percent
+    p.technique = body.technique.value if body.technique is not None else None
+    p.technique_rounds = body.technique_rounds
+    p.technique_amount = body.technique_amount
     p.set_by_id = coach.id
     session.add(p)
 

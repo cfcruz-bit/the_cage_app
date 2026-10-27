@@ -122,7 +122,10 @@ async def test_el_historial_trae_las_sesiones_cerradas_sin_la_actual(
     assert hist[0]["weekNumber"] == 1
     assert hist[0]["otherBlock"] is False
     assert hist[0]["targetRir"] == 2
-    assert hist[0]["sets"] == [{"weightKg": 60.0, "reps": "8"}, {"weightKg": 60.0, "reps": "7"}]
+    assert hist[0]["sets"] == [
+        {"weightKg": 60.0, "reps": "8", "subSets": None},
+        {"weightKg": 60.0, "reps": "7", "subSets": None},
+    ]
     assert hist[0]["feedback"] is None
 
 

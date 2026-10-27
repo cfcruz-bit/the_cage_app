@@ -11,6 +11,7 @@
  * OpenAPI, y está fuera del alcance de la Fase 3.
  */
 
+import type { Technique } from '@/lib/technique';
 import type {
   Aggressiveness,
   Exercise,
@@ -65,7 +66,14 @@ export interface BackoffIn {
   backoffLoadPercent: number | null;
 }
 
-export interface PrescriptionIn extends BackoffIn {
+/** Técnica del último set. Opcional: todo null = sin técnica. */
+export interface TechniqueIn {
+  technique: Technique | null;
+  techniqueRounds: number | null;
+  techniqueAmount: number | null;
+}
+
+export interface PrescriptionIn extends BackoffIn, TechniqueIn {
   /** null = para todo el bloque. N = solo para esa semana. */
   weekNumber: number | null;
   sets: number | null;
@@ -208,6 +216,8 @@ export interface PlannedSetOut {
   done: boolean;
   /** True en las series que van detrás del top set. */
   backoff: boolean;
+  /** Las partes después de la primera en un set con técnica: "4+3". */
+  loggedSubSets?: string | null;
 }
 
 export interface SessionExerciseOut {
@@ -224,6 +234,10 @@ export interface SessionExerciseOut {
   targetRir?: number;
   /** Nota fija del coach para el ejercicio. */
   note?: string | null;
+  /** Técnica del ÚLTIMO set, congelada. null = sin técnica. */
+  technique?: Technique | null;
+  techniqueRounds?: number | null;
+  techniqueAmount?: number | null;
   /** null en la primera sesión de un ejercicio sin arranque todavía. */
   plannedLoadKg: number | null;
   /** Con back-off, solo los top sets. */
@@ -396,6 +410,10 @@ export interface PlanCellOut {
   backoffLoadKg: number | null;
   backoffLoadPercent: number | null;
   backoffNeedsOneRm: boolean;
+  /** Técnica del último set. null = sin técnica (y siempre en el deload). */
+  technique: Technique | null;
+  techniqueRounds: number | null;
+  techniqueAmount: number | null;
   setsOverridden: boolean;
   loadOverridden: boolean;
   repsOverridden: boolean;
@@ -422,7 +440,7 @@ export interface HistoryEntryOut {
   otherBlock: boolean;
   targetRir: number;
   /** Solo los sets hechos, en orden. */
-  sets: { weightKg: number | null; reps: string | null }[];
+  sets: { weightKg: number | null; reps: string | null; subSets: string | null }[];
   feedback: Feedback | null;
 }
 

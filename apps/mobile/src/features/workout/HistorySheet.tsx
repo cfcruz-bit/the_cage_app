@@ -33,7 +33,8 @@ function shortDate(iso: string): string {
 }
 
 function setText(s: HistoryEntryOut['sets'][number], unit: Unit): string {
-  return `${s.weightKg === null ? '—' : formatNumber(s.weightKg, unit)} × ${s.reps ?? '—'}`;
+  const parts = s.subSets ? `+${s.subSets}` : '';
+  return `${s.weightKg === null ? '—' : formatNumber(s.weightKg, unit)} × ${s.reps ?? '—'}${parts}`;
 }
 
 /** El set con el 1RM estimado más alto (Epley). Sin reps legibles no compite. */

@@ -204,6 +204,8 @@ def effective_prescription(
     # El back-off tambien va en bloque: mezclar los sets de uno con la carga
     # de otro daria una serie que nadie pauto.
     backoff = week if week.backoff_sets is not None else base
+    # La tecnica, igual: su tipo, rondas y cantidad solo tienen sentido juntos.
+    technique = week if week.technique is not None else base
 
     return Prescription(
         mesocycle_exercise_id=mex.id,
@@ -219,6 +221,9 @@ def effective_prescription(
         backoff_reps=backoff.backoff_reps,
         backoff_load_kg=backoff.backoff_load_kg,
         backoff_load_percent=backoff.backoff_load_percent,
+        technique=technique.technique,
+        technique_rounds=technique.technique_rounds,
+        technique_amount=technique.technique_amount,
     )
 
 
@@ -369,6 +374,21 @@ def resolve_backoff(
     return p.backoff_sets, p.backoff_reps, load_kg
 
 
+def resolve_technique(p: Prescription | None, is_deload: bool) -> dict:
+    """La tecnica del ultimo set lista para guardar o pintar. En deload, ninguna.
+
+    El deload existe para descargar fatiga: una tecnica de intensidad pautada
+    para todo el bloque no tiene sentido justo esa semana.
+    """
+    if p is None or p.technique is None or is_deload:
+        return {"technique": None, "technique_rounds": None, "technique_amount": None}
+    return {
+        "technique": p.technique,
+        "technique_rounds": p.technique_rounds,
+        "technique_amount": p.technique_amount,
+    }
+
+
 def rest_seconds_for(mex: MesocycleExercise, week_number: int | None = None) -> int:
     """El descanso SIEMPRE lo pauta el coach: no tiene modo automatico."""
     p = effective_prescription(mex, week_number)
@@ -491,6 +511,7 @@ def project_grid(
         backoff = resolve_backoff(p, one_rm_kg, increment)
         rows.append(
             {
+                **resolve_technique(p, is_deload),
                 "backoff_sets": backoff[0] if backoff else None,
                 "backoff_reps": backoff[1] if backoff else None,
                 "backoff_load_kg": backoff[2] if backoff else None,

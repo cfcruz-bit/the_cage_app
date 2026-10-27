@@ -23,6 +23,7 @@ from app.models.training import (
     OneRepMax,
     OneRepMaxSource,
     Prescription,
+    Technique,
     TrainingGoal,
 )
 from app.models.user import (
@@ -50,6 +51,7 @@ __all__ = [
     "RefreshToken",
     "SessionExercise",
     "SetLog",
+    "Technique",
     "TrainingGoal",
     "TrainingSession",
     "User",

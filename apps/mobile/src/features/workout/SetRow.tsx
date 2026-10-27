@@ -33,11 +33,17 @@ interface Props {
   /** Lo que el atleta reportó, si reportó algo distinto. */
   loggedWeightKg: number | null;
   loggedReps: string | null;
+  /** Las partes tras la primera, en un set con técnica: "4+3". */
+  loggedSubSets: string | null;
   done: boolean;
   /** Es el próximo set pendiente de toda la sesión. */
   isNext: boolean;
   /** Solo cuando el ejercicio lleva back-off: distingue el top de los back-offs. */
   kind?: 'top' | 'backoff';
+  /** Etiqueta de la técnica del set (RP, DROP, MYO). Gana a la de TOP/B-O. */
+  techniqueTag?: string;
+  /** Los pesos de las bajadas de un drop set, ya formateados: "→ 42,5 → 32,5". */
+  chain?: string;
 
   onToggle: () => void;
   onReport: () => void;
@@ -54,9 +60,12 @@ export const SetRow = memo(function SetRow({
   why,
   loggedWeightKg,
   loggedReps,
+  loggedSubSets,
   done,
   isNext,
   kind,
+  techniqueTag,
+  chain,
   onToggle,
   onReport,
 }: Props) {
@@ -92,7 +101,9 @@ export const SetRow = memo(function SetRow({
         </Pressable>
 
         <View style={styles.cell}>
-          {kind !== undefined ? (
+          {techniqueTag !== undefined ? (
+            <Text style={[styles.kind, styles.kindTech]}>{techniqueTag}</Text>
+          ) : kind !== undefined ? (
             <Text style={styles.kind}>{kind === 'top' ? 'TOP' : 'B-O'}</Text>
           ) : null}
           <Text style={[styles.value, done && styles.valueDone, weightChanged && styles.valueChanged]}>
@@ -101,11 +112,15 @@ export const SetRow = memo(function SetRow({
           {weightChanged ? (
             <Text style={styles.was}>{formatNumber(targetWeightKg, unit)}</Text>
           ) : null}
+          {chain !== undefined ? <Text style={styles.chain}>{chain}</Text> : null}
         </View>
 
         <View style={styles.cell}>
           <Text style={[styles.value, done && styles.valueDone, repsChanged && styles.valueChanged]}>
             {shownReps ?? '—'}
+            {done && loggedSubSets ? (
+              <Text style={styles.subSets}>+{loggedSubSets}</Text>
+            ) : null}
           </Text>
           {repsChanged ? <Text style={styles.was}>{targetReps}</Text> : null}
         </View>
@@ -181,6 +196,9 @@ const styles = StyleSheet.create({
   },
   cell: { flex: 1, alignItems: 'center' },
   kind: { color: color.accent, fontSize: 10, fontWeight: '500', letterSpacing: 1.6 },
+  kindTech: { color: color.tech, fontWeight: '600' },
+  chain: { color: color.textMuted, fontSize: 11.5, fontVariant: ['tabular-nums'] },
+  subSets: { color: palette.a300, fontSize: 15 },
   value: {
     color: color.text,
     fontSize: 18,

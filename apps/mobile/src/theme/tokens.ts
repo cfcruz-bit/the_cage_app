@@ -126,6 +126,8 @@ export const color = {
   pinBg: scheme === 'light' ? '#f3ead2' : '#221f18',
   pinBorder: scheme === 'light' ? '#e2d5b0' : '#3a352a',
   pinText: scheme === 'light' ? '#2e2e2b' : '#ece7db',
+  /** Técnicas de intensidad (RP, DROP, MYO): amarillo de disco, aparte del rojo. */
+  tech: scheme === 'light' ? '#8a6a00' : '#e3b322',
 } as const;
 
 /** Barra de estado del sistema: texto claro sobre oscuro y al revés. */

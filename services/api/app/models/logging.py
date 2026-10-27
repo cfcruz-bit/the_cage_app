@@ -92,6 +92,12 @@ class SessionExercise(Base, TimestampMixin):
             "(backoff_sets >= 1 AND backoff_reps >= 1 AND backoff_load_kg > 0)",
             name="backoff_congelado",
         ),
+        CheckConstraint(
+            "(technique IS NULL AND technique_rounds IS NULL AND technique_amount IS NULL) OR "
+            "(technique IS NOT NULL AND technique_rounds >= 1 AND technique_rounds <= 6"
+            " AND technique_amount >= 1 AND technique_amount <= 60)",
+            name="tecnica_congelada",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_uuid)
@@ -115,6 +121,11 @@ class SessionExercise(Base, TimestampMixin):
     backoff_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
     backoff_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     backoff_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    #: Tecnica del ultimo set, congelada. NULL en deload aunque estuviera pautada.
+    technique: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    technique_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    technique_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     #: Version de las reglas con las que se calculo. Sin esto el historico no
     #: se puede interpretar cuando la politica cambie.

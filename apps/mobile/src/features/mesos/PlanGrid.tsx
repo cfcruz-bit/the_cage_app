@@ -32,9 +32,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { ApiError } from '@/api/client';
 import { planGrid, setExerciseNote, setPrescription } from '@/api/endpoints';
 import type { PlanCellOut, PlanGridOut, PlanRowOut } from '@/api/types';
+import { Chip } from '@/components/Chip';
 import { dayHeading, groupByDay } from '@/lib/days';
 import { NO_BACKOFF, type ParsedLoad, parseBackoff, parseLoadInput } from '@/lib/loadInput';
 import { useRemote } from '@/lib/remote';
+import { TECHNIQUES, TECHNIQUE_FIELDS, type Technique, techniqueTag } from '@/lib/technique';
 import { type Unit, formatNumber } from '@/lib/units';
 import { useSession } from '@/stores/session';
 import { color, palette, radius, space } from '@/theme/tokens';
@@ -59,6 +61,19 @@ function backoffText(cell: PlanCellOut, unit: Unit): string | null {
       ? kg
       : `${trimPct(cell.backoffLoadPercent)}% · ${kg ?? 'sin marca'}`;
   return `${cell.backoffSets}×${cell.backoffReps} · ${load}`;
+}
+
+/** "RP · 2 mini-series · 15 s", o null si la semana no lleva técnica. */
+function techniqueLine(cell: PlanCellOut): string | null {
+  const { technique, techniqueRounds: r, techniqueAmount: a } = cell;
+  if (technique === null || r === null || a === null) return null;
+  const detail =
+    technique === 'rest_pause'
+      ? `${r} mini-series · ${a} s`
+      : technique === 'drop_set'
+        ? `${r} bajadas · ${a} %`
+        : `${r} × ${a} reps`;
+  return `${techniqueTag(technique)} · ${detail}`;
 }
 
 function trimPct(v: number): string {
@@ -218,6 +233,9 @@ export function PlanGrid({
                       >
                         BACK-OFF {backoff}
                       </Text>
+                    ) : null}
+                    {techniqueLine(cell) !== null ? (
+                      <Text style={[styles.backoffLine, styles.techLine]}>{techniqueLine(cell)}</Text>
                     ) : null}
                   </Pressable>
                 );
@@ -445,11 +463,33 @@ function CellSheet({
         ? String(cell.backoffLoadKg)
         : '',
   );
+  // Opcional: null es "sin técnica" y es como arranca cualquier celda.
+  const [tech, setTech] = useState<Technique | null>(cell.technique);
+  const [tRounds, setTRounds] = useState(
+    cell.techniqueRounds == null ? '' : String(cell.techniqueRounds),
+  );
+  const [tAmount, setTAmount] = useState(
+    cell.techniqueAmount == null ? '' : String(cell.techniqueAmount),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function chooseTechnique(value: Technique | null) {
+    setTech(value);
+    const found = TECHNIQUES.find((t) => t.value === value);
+    setTRounds(found ? String(found.defaults[0]) : '');
+    setTAmount(found ? String(found.defaults[1]) : '');
+  }
+
   async function save() {
     if (busy) return;
+
+    const rounds = tech === null ? null : numberOrNull(tRounds);
+    const amount = tech === null ? null : numberOrNull(tAmount);
+    if (tech !== null && (rounds === null || amount === null)) {
+      setError('La técnica lleva sus dos números, o elige "Ninguna".');
+      return;
+    }
 
     const lo = numberOrNull(repLo);
     const hi = numberOrNull(repHi);
@@ -487,6 +527,9 @@ function CellSheet({
         repHi: hi,
         targetRir: numberOrNull(rir),
         restSeconds: numberOrNull(rest) ?? cell.restSeconds,
+        technique: tech,
+        techniqueRounds: rounds,
+        techniqueAmount: amount,
       });
       onSaved();
     } catch (e) {
@@ -563,6 +606,45 @@ function CellSheet({
               </>
             ) : null}
 
+            {cell.isDeload ? null : (
+              <>
+                <Text style={styles.fieldLabel}>Técnica en el último set (opcional)</Text>
+                <View style={styles.chips}>
+                  <Chip label="Ninguna" active={tech === null} onPress={() => chooseTechnique(null)} />
+                  {TECHNIQUES.map((t) => (
+                    <Chip
+                      key={t.value}
+                      label={t.label}
+                      active={tech === t.value}
+                      onPress={() => chooseTechnique(t.value)}
+                    />
+                  ))}
+                </View>
+                {tech !== null ? (
+                  <>
+                    <View style={styles.fields}>
+                      <Field
+                        label={TECHNIQUE_FIELDS[tech][0]}
+                        value={tRounds}
+                        onChange={setTRounds}
+                        auto=""
+                      />
+                      <Field
+                        label={TECHNIQUE_FIELDS[tech][1]}
+                        value={tAmount}
+                        onChange={setTAmount}
+                        auto=""
+                      />
+                    </View>
+                    <Text style={styles.hintFaint}>
+                      El motor progresa con la primera parte del set: la técnica no sube la
+                      carga de la semana siguiente.
+                    </Text>
+                  </>
+                ) : null}
+              </>
+            )}
+
             {error !== null ? <Text style={styles.error}>{error}</Text> : null}
           </ScrollView>
 
@@ -577,6 +659,7 @@ function CellSheet({
                 setBSets('');
                 setBReps('');
                 setBLoad('');
+                chooseTechnique(null);
               }}
               accessibilityRole="button"
               style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
@@ -738,6 +821,8 @@ const styles = StyleSheet.create({
   },
 
   fields: { flexDirection: 'row', gap: space.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  techLine: { color: color.tech },
   field: { flex: 1, gap: 4 },
   fieldLabel: { color: color.textFaint, fontSize: 12, letterSpacing: 0.2 },
   fieldInput: {

@@ -39,6 +39,7 @@ import { SessionExerciseCard } from '@/features/workout/SessionExerciseCard';
 import { GenerateSessionSheet } from '@/features/workout/GenerateSessionSheet';
 import { type HistoryTarget, HistorySheet } from '@/features/workout/HistorySheet';
 import { nextUpText } from '@/lib/days';
+import { joinParts, techniqueOf } from '@/lib/technique';
 import { useApp } from '@/stores/app';
 import { useSession } from '@/stores/session';
 import { useSync } from '@/stores/sync';
@@ -74,6 +75,8 @@ export default function WorkoutScreen() {
   } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [historyFor, setHistoryFor] = useState<HistoryTarget | null>(null);
+  /** Ejercicio con el panel de la técnica de su último set abierto. */
+  const [techniqueFor, setTechniqueFor] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -94,6 +97,7 @@ export default function WorkoutScreen() {
           done: s.done,
           loggedWeightKg: s.loggedWeightKg,
           loggedReps: s.loggedReps,
+          loggedSubSets: s.loggedSubSets ?? null,
         }),
       })),
     }));
@@ -255,6 +259,11 @@ export default function WorkoutScreen() {
       exercise: row.exercise,
       set,
       setCount: row.sets.length,
+      // El último set con técnica no se marca de un toque: abre sus partes.
+      technique:
+        techniqueOf(row.exercise) !== null &&
+        set === row.sets[row.sets.length - 1] &&
+        set.targetWeightKg !== null,
       barbell: /^(barra|barbell)/i.test(row.exercise.exercise?.equipment ?? ''),
     };
   })();
@@ -358,6 +367,10 @@ export default function WorkoutScreen() {
           onDone={() => {
             const { targetWeightKg, targetReps } = focus.set;
             if (targetWeightKg === null || targetReps === null) return;
+            if (focus.technique) {
+              setTechniqueFor(focus.exercise.id);
+              return;
+            }
             onToggle(focus.exercise.id, focus.exercise.restSeconds)(
               focus.set.index,
               targetWeightKg,
@@ -419,6 +432,23 @@ export default function WorkoutScreen() {
               }}
               onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
               onFeedback={() => setFeedbackFor(exercise.id)}
+              techniqueOpen={techniqueFor === exercise.id}
+              onTechnique={() =>
+                setTechniqueFor((open) => (open === exercise.id ? null : exercise.id))
+              }
+              onTechniqueSave={(parts) => {
+                const last = sets[sets.length - 1];
+                if (last === undefined) return;
+                const { reps, subSets } = joinParts(parts);
+                void reportSet(exercise.id, last.index, {
+                  weightKg: last.targetWeightKg,
+                  reps,
+                  rpe: null,
+                  subSets,
+                });
+                setTechniqueFor(null);
+                setRest({ seconds: exercise.restSeconds, key: `${exercise.id}:${last.index}` });
+              }}
               onHistory={() =>
                 setHistoryFor({
                   sessionId: session.id,

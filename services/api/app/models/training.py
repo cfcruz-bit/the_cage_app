@@ -70,6 +70,24 @@ class TrainingGoal(StrEnum):
     HYBRID = "hibrido"
 
 
+class Technique(StrEnum):
+    """Tecnica de intensidad del ULTIMO set de un ejercicio. Siempre opcional.
+
+    Cada una usa `technique_rounds` y `technique_amount` a su manera:
+
+    - rest-pause: mini-series, y segundos de pausa entre ellas.
+    - drop set: bajadas, y % que baja la carga en cada una.
+    - myo-reps: mini-series, y reps de cada mini-serie.
+
+    El motor NO la ve: progresa con la primera parte del set (las reps se
+    guardan aparte en `SetLog.sub_sets`). Suma estimulo, no mueve la carga.
+    """
+
+    REST_PAUSE = "rest_pause"
+    DROP_SET = "drop_set"
+    MYO_REPS = "myo_reps"
+
+
 class OneRepMaxSource(StrEnum):
     """De donde salio la marca. No todas valen lo mismo."""
 
@@ -388,6 +406,13 @@ class Prescription(Base, TimestampMixin):
             "(backoff_load_percent >= 30 AND backoff_load_percent <= 110)",
             name="backoff_pct_razonable",
         ),
+        # Tecnica: va entera (tipo, rondas y cantidad) o no va.
+        CheckConstraint(
+            "(technique IS NULL AND technique_rounds IS NULL AND technique_amount IS NULL) OR "
+            "(technique IS NOT NULL AND technique_rounds >= 1 AND technique_rounds <= 6"
+            " AND technique_amount >= 1 AND technique_amount <= 60)",
+            name="tecnica_completa",
+        ),
         # Indice parcial: impide DOS prescripciones base para el mismo
         # ejercicio. El UNIQUE de arriba no lo cubre, porque tanto SQLite como
         # Postgres consideran que dos NULL son distintos.
@@ -437,6 +462,12 @@ class Prescription(Base, TimestampMixin):
     backoff_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     backoff_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     backoff_load_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    #: Tecnica de intensidad del ultimo set (ver `Technique`). Todo NULL = sin
+    #: tecnica, que es lo normal: el coach la pone solo si quiere.
+    technique: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    technique_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    technique_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     #: Que coach la firmo. Para el historial de "quien cambio esto".
     set_by_id: Mapped[uuid.UUID | None] = mapped_column(
