@@ -215,6 +215,15 @@ export interface SessionExerciseOut {
   position: number;
   name: string;
   muscle: string;
+  /**
+   * Opcionales solo para la sesión guardada en el teléfono antes de que el
+   * servidor los mandara: hasta el siguiente refresco llega sin ellos.
+   */
+  equipment?: string;
+  /** RIR de ESTA semana: lo del coach, el del ejercicio o el del deload. */
+  targetRir?: number;
+  /** Nota fija del coach para el ejercicio. */
+  note?: string | null;
   /** null en la primera sesión de un ejercicio sin arranque todavía. */
   plannedLoadKg: number | null;
   /** Con back-off, solo los top sets. */
@@ -399,7 +408,22 @@ export interface PlanRowOut {
   name: string;
   muscle: string;
   equipment: string;
+  note: string | null;
   weeks: PlanCellOut[];
+}
+
+/** Una vez anterior que el atleta hizo un ejercicio, ya cerrada. */
+export interface HistoryEntryOut {
+  sessionId: string;
+  completedAt: string;
+  weekNumber: number;
+  isDeload: boolean;
+  /** Fue en otro bloque: el historial cruza mesociclos. */
+  otherBlock: boolean;
+  targetRir: number;
+  /** Solo los sets hechos, en orden. */
+  sets: { weightKg: number | null; reps: string | null }[];
+  feedback: Feedback | null;
 }
 
 export interface PlanGridOut {

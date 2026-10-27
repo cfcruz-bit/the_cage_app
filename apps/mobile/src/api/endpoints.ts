@@ -14,6 +14,7 @@ import type {
   CurrentSessionOut,
   ExerciseCatalogOut,
   FeedbackIn,
+  HistoryEntryOut,
   MesocycleIn,
   MesocycleOut,
   MesocycleSummaryOut,
@@ -126,6 +127,18 @@ export async function setPrescription(
   );
 }
 
+/** Nota fija del coach para un ejercicio del bloque. Vacía la borra. */
+export async function setExerciseNote(
+  mesocycleId: string,
+  exerciseId: string,
+  note: string,
+): Promise<void> {
+  return request<void>(`/mesocycles/${mesocycleId}/exercises/${exerciseId}/note`, {
+    method: 'PUT',
+    body: { note },
+  });
+}
+
 // ── Sesiones ────────────────────────────────────────────────────────────────
 
 /**
@@ -182,6 +195,16 @@ export async function pushFeedback(
     method: 'POST',
     body,
   });
+}
+
+/** Las veces anteriores que el atleta hizo este ejercicio, la más reciente primero. */
+export async function exerciseHistory(
+  sessionId: string,
+  sessionExerciseId: string,
+): Promise<HistoryEntryOut[]> {
+  return request<HistoryEntryOut[]>(
+    `/sessions/${sessionId}/exercises/${sessionExerciseId}/history`,
+  );
 }
 
 export async function completeSession(sessionId: string): Promise<SessionOut> {

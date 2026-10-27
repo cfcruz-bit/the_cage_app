@@ -23,6 +23,7 @@ from app.api.deps import (
     writable_mesocycle,
 )
 from app.api.dto import (
+    ExerciseNoteIn,
     MesocycleDayIn,
     MesocycleDayOut,
     MesocycleDaysIn,
@@ -430,6 +431,7 @@ async def plan_grid(meso: ReadableMeso, session: SessionDep) -> PlanGridOut:
                 name=mex.catalog.name,
                 muscle=mex.catalog.muscle,
                 equipment=mex.catalog.equipment,
+                note=mex.note,
                 weeks=[PlanCellOut(**cell) for cell in cells],
             )
         )
@@ -597,3 +599,29 @@ async def set_prescription(
     out = _to_prescription_out(mex.id, p, mark)
     assert out is not None
     return out
+
+
+@router.put(
+    "/{mesocycle_id}/exercises/{exercise_id}/note",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def set_note(
+    exercise_id: uuid.UUID,
+    body: ExerciseNoteIn,
+    meso: WritableMeso,
+    session: SessionDep,
+) -> None:
+    """Fija o borra la nota del coach para un ejercicio del bloque.
+
+    Vale para todas las semanas: es una indicacion de tecnica o de ejecucion
+    ("pausa de 1 s abajo"), no una pauta semanal. Para eso esta la prescripcion.
+    """
+    mex = await session.get(MesocycleExercise, exercise_id)
+    if mex is None or mex.mesocycle_id != meso.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ese ejercicio no esta en este mesociclo",
+        )
+    text = (body.note or "").strip()
+    mex.note = text or None
+    await session.commit()

@@ -20,6 +20,8 @@ interface Props {
   targetWeightKg: number | null;
   targetReps: number | null;
   why: string;
+  /** Reps a dejar en reserva esta semana. null si la sesión no lo trae. */
+  rir: number | null;
   /** El ejercicio se hace con barra: tiene sentido dibujar los discos. */
   barbell: boolean;
   onDone: () => void;
@@ -34,6 +36,7 @@ export function FocusSet({
   targetWeightKg,
   targetReps,
   why,
+  rir,
   barbell,
   onDone,
   onReport,
@@ -57,6 +60,7 @@ export function FocusSet({
           <Text style={styles.unit}>
             {unit} × {targetReps}
           </Text>
+          {rir !== null ? <Text style={styles.rir}>deja {rir} en reserva</Text> : null}
         </View>
       ) : (
         <Text style={styles.noTarget}>Sin carga pautada todavía</Text>
@@ -116,6 +120,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   unit: { ...condensed, color: color.bone, fontSize: 24 },
+  rir: { marginLeft: 'auto', color: color.bone, opacity: 0.85, fontSize: 13 },
   noTarget: { color: color.bone, fontSize: 20, fontWeight: '600' },
   why: { color: color.bone, opacity: 0.85, fontSize: 13.5, lineHeight: 18 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: 2 },

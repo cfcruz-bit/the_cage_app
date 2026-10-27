@@ -30,7 +30,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { ApiError } from '@/api/client';
-import { planGrid, setPrescription } from '@/api/endpoints';
+import { planGrid, setExerciseNote, setPrescription } from '@/api/endpoints';
 import type { PlanCellOut, PlanGridOut, PlanRowOut } from '@/api/types';
 import { dayHeading, groupByDay } from '@/lib/days';
 import { NO_BACKOFF, type ParsedLoad, parseBackoff, parseLoadInput } from '@/lib/loadInput';
@@ -84,6 +84,7 @@ export function PlanGrid({
     row: PlanRowOut;
     cell: PlanCellOut;
   } | null>(null);
+  const [noteFor, setNoteFor] = useState<PlanRowOut | null>(null);
 
   // Con el selector, no con getState(): leerlo fuera del ciclo de React
   // dejaría la tabla en kilos después de que el atleta cambie a libras.
@@ -137,6 +138,23 @@ export function PlanGrid({
         <View key={row.mesocycleExerciseId} style={styles.card}>
           <Text style={styles.name}>{row.name}</Text>
           <Text style={styles.meta}>{row.equipment}</Text>
+
+          {/* La nota fija: el atleta la ve encima de sus sets cada semana. */}
+          {readOnly ? (
+            row.note ? <Text style={styles.note}>{row.note}</Text> : null
+          ) : (
+            <Pressable
+              onPress={() => setNoteFor(row)}
+              accessibilityRole="button"
+              accessibilityLabel={row.note ? `Editar la nota de ${row.name}` : `Añadir nota a ${row.name}`}
+              style={({ pressed }) => [styles.noteRow, pressed && { opacity: 0.6 }]}
+            >
+              <Ionicons name="pin-outline" size={13} color={row.note ? color.text : color.accent} />
+              <Text style={row.note ? styles.note : styles.link} numberOfLines={2}>
+                {row.note ?? 'Añadir nota para el atleta'}
+              </Text>
+            </Pressable>
+          )}
 
           {/* La tabla desborda a lo ancho en cuanto hay 6 semanas: se desplaza
               sola en vez de apretar las columnas hasta que no se lean. */}
@@ -211,6 +229,18 @@ export function PlanGrid({
         </View>
       ))}
 
+      {noteFor !== null ? (
+        <NoteSheet
+          mesocycleId={mesocycleId}
+          row={noteFor}
+          onClose={() => setNoteFor(null)}
+          onSaved={() => {
+            setNoteFor(null);
+            remote.reload();
+          }}
+        />
+      ) : null}
+
       {editing !== null ? (
         <CellSheet
           mesocycleId={mesocycleId}
@@ -265,6 +295,112 @@ function Value({
       </Text>
       {pinned ? <View style={styles.pin} /> : null}
     </View>
+  );
+}
+
+/* ── Nota del coach ───────────────────────────────────────────────────────── */
+
+/** Una sola nota por ejercicio, para todo el bloque. Vaciarla la borra. */
+function NoteSheet({
+  mesocycleId,
+  row,
+  onClose,
+  onSaved,
+}: {
+  mesocycleId: string;
+  row: PlanRowOut;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [text, setText] = useState(row.note ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setExerciseNote(mesocycleId, row.mesocycleExerciseId, text);
+      onSaved();
+    } catch (e) {
+      setError(
+        e instanceof ApiError
+          ? e.offline
+            ? 'Sin conexión con el servidor.'
+            : e.message
+          : 'No se pudo guardar.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.lift} behavior="padding">
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar" />
+
+        <View style={styles.sheet}>
+          <View style={styles.sheetHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sheetTitle}>{row.name.toUpperCase()}</Text>
+              <Text style={styles.meta}>Nota para todo el bloque</Text>
+            </View>
+            <Pressable onPress={onClose} accessibilityRole="button" hitSlop={10}>
+              <Ionicons name="close" size={19} color={color.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={styles.sheetBody}>
+            <Text style={styles.hint}>
+              El atleta la ve encima de sus sets cada semana. Úsala para técnica o
+              ejecución: "pausa de 1 s abajo", "drop set en la última".
+            </Text>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              multiline
+              maxLength={280}
+              autoFocus
+              placeholder="Escribe la indicación"
+              placeholderTextColor={color.textFaint}
+              accessibilityLabel={`Nota de ${row.name}`}
+              style={[styles.fieldInput, styles.noteInput]}
+            />
+            <Text style={styles.hintFaint}>{text.length}/280</Text>
+            {error !== null ? <Text style={styles.error}>{error}</Text> : null}
+          </View>
+
+          <View style={styles.sheetFooter}>
+            <Pressable
+              onPress={() => setText('')}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.7 }]}
+            >
+              <Text style={styles.secondaryText}>Borrar nota</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => void save()}
+              disabled={busy}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.primary,
+                busy && { opacity: 0.4 },
+                pressed && !busy && { backgroundColor: palette.accentEdge },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={color.onAccent} />
+              ) : (
+                <Text style={styles.primaryText}>GUARDAR</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -532,6 +668,9 @@ const styles = StyleSheet.create({
   },
   name: { color: color.text, fontSize: 14.5, fontWeight: '600' },
   meta: { color: color.textMuted, fontSize: 12, marginTop: 1 },
+  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: space.sm },
+  note: { flex: 1, color: color.text, fontSize: 12.5, lineHeight: 17 },
+  noteInput: { minHeight: 88, textAlignVertical: 'top', textAlign: 'left' },
 
   head: {
     flexDirection: 'row',

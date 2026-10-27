@@ -37,6 +37,7 @@ import { LoadedBar } from '@/features/workout/LoadedBar';
 import { RestTimer } from '@/features/workout/RestTimer';
 import { SessionExerciseCard } from '@/features/workout/SessionExerciseCard';
 import { GenerateSessionSheet } from '@/features/workout/GenerateSessionSheet';
+import { type HistoryTarget, HistorySheet } from '@/features/workout/HistorySheet';
 import { nextUpText } from '@/lib/days';
 import { useApp } from '@/stores/app';
 import { useSession } from '@/stores/session';
@@ -72,6 +73,7 @@ export default function WorkoutScreen() {
     index: number;
   } | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [historyFor, setHistoryFor] = useState<HistoryTarget | null>(null);
 
   useEffect(() => {
     void load();
@@ -237,6 +239,11 @@ export default function WorkoutScreen() {
 
   const active = resolved.find((r) => r.exercise.id === feedbackFor);
 
+  // El RIR va en la cabecera solo si es el mismo en todo el día; si el coach
+  // pautó RIR distintos, cada ejercicio ya lo lleva en su línea.
+  const rirs = new Set(session.exercises.map((e) => e.targetRir).filter((r) => r != null));
+  const dayRir = rirs.size === 1 ? [...rirs][0] : null;
+
   /** El set que toca: lo que ocupa la parte de arriba de la pantalla. */
   const focus = (() => {
     const fp = summary.firstPending;
@@ -282,12 +289,32 @@ export default function WorkoutScreen() {
         session.dayLabel === `Día ${session.dayNumber}` ? '' : `${session.dayLabel} · `
       }${formatLoad(Math.round(summary.volumeKg), unit)} de volumen`}
       trailing={
-        <Text style={styles.progress} accessibilityLabel={`${summary.done} de ${summary.total} sets`}>
-          {summary.done}
-          <Text style={styles.progressTotal}>/{summary.total}</Text>
-        </Text>
+        <View style={styles.trailing}>
+          <Text
+            style={styles.progress}
+            accessibilityLabel={`${summary.done} de ${summary.total} sets`}
+          >
+            {summary.done}
+            <Text style={styles.progressTotal}>/{summary.total}</Text>
+          </Text>
+          {dayRir != null ? (
+            <Text style={styles.rir} accessibilityLabel={`Deja ${dayRir} repeticiones en reserva`}>
+              {dayRir} RIR
+            </Text>
+          ) : null}
+        </View>
       }
     >
+      {session.isDeload ? (
+        <View style={styles.deload}>
+          <Ionicons name="arrow-down" size={14} color={color.textMuted} />
+          <Text style={styles.deloadText}>
+            <Text style={styles.deloadStrong}>Semana de deload. </Text>
+            Menos sets y menos peso para que llegues fresco al próximo bloque.
+          </Text>
+        </View>
+      ) : null}
+
       {stale || pending > 0 ? (
         <View style={styles.banner}>
           <Ionicons
@@ -326,6 +353,7 @@ export default function WorkoutScreen() {
           targetWeightKg={focus.set.targetWeightKg}
           targetReps={focus.set.targetReps}
           why={focus.set.why || focus.exercise.why}
+          rir={focus.exercise.targetRir ?? null}
           barbell={focus.barbell}
           onDone={() => {
             const { targetWeightKg, targetReps } = focus.set;
@@ -391,6 +419,13 @@ export default function WorkoutScreen() {
               }}
               onReport={(index) => setDeviation({ exerciseId: exercise.id, index })}
               onFeedback={() => setFeedbackFor(exercise.id)}
+              onHistory={() =>
+                setHistoryFor({
+                  sessionId: session.id,
+                  sessionExerciseId: exercise.id,
+                  name: exercise.name,
+                })
+              }
             />
           </View>
         ))}
@@ -417,6 +452,8 @@ export default function WorkoutScreen() {
         }}
         onClose={() => setFeedbackFor(null)}
       />
+
+      <HistorySheet target={historyFor} unit={unit} onClose={() => setHistoryFor(null)} />
 
       <DeviationSheet
         target={deviationTarget}
@@ -503,7 +540,23 @@ function SessionDone({
 const styles = StyleSheet.create({
   list: { paddingBottom: space.lg },
   titleDay: { color: color.textFaint },
+  trailing: { alignItems: 'flex-end' },
   progress: { ...condensed, color: color.text, fontSize: 28, fontVariant: ['tabular-nums'] },
+  rir: { color: color.accent, fontSize: 12, fontWeight: '600', letterSpacing: 0.4 },
+  deload: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.sm,
+    marginHorizontal: space.lg,
+    marginBottom: space.md,
+    padding: space.md,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.chip,
+    backgroundColor: color.bgSunken,
+  },
+  deloadText: { flex: 1, color: color.textMuted, fontSize: 12.5, lineHeight: 17 },
+  deloadStrong: { color: color.text, fontWeight: '600' },
   progressTotal: { color: color.textFaint, fontSize: 20 },
   upNext: { color: color.bone, fontSize: 14, lineHeight: 19 },
   center: {

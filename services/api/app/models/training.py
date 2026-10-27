@@ -32,6 +32,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     text,
@@ -305,6 +306,11 @@ class MesocycleExercise(Base, TimestampMixin):
     starting_load_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     starting_reps: Mapped[int] = mapped_column(Integer, nullable=False)
     starting_sets: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+
+    #: Nota fija del coach para este ejercicio ("pausa de 1 s abajo"). Vale para
+    #: todo el bloque y el atleta la ve encima de sus sets cada semana. NULL = sin
+    #: nota; nunca cadena vacia, para que "hay nota" sea una sola comprobacion.
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     mesocycle: Mapped[Mesocycle] = relationship(back_populates="exercises")
     catalog: Mapped[ExerciseCatalog] = relationship()

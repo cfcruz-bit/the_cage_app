@@ -5,9 +5,37 @@
  * está aquí, se añade aquí primero.
  */
 
-import { Platform } from 'react-native';
+import { Appearance, Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 
-export const palette = {
+/**
+ * Tema. Se decide UNA vez, al arrancar, y no cambia con la app abierta.
+ *
+ * Todas las pantallas leen estos tokens dentro de `StyleSheet.create`, que se
+ * evalúa al importar. Cambiar de tema en caliente obligaría a pasar cada
+ * pantalla a un hook; en vez de eso, Ajustes guarda la preferencia y recarga
+ * la app. Un cambio que se hace una vez no justifica tocar treinta archivos.
+ *
+ * Por eso se lee con `SecureStore.getItem`, que es síncrono: hace falta antes
+ * del primer render, cuando todavía no hay nada asíncrono resuelto.
+ */
+export type ThemePref = 'dark' | 'light' | 'system';
+export const THEME_KEY = 'cage.theme';
+
+function readThemePref(): ThemePref {
+  try {
+    const v = SecureStore.getItem(THEME_KEY);
+    return v === 'light' || v === 'system' ? v : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+export const themePref = readThemePref();
+export const scheme: 'dark' | 'light' =
+  themePref === 'system' ? (Appearance.getColorScheme() === 'light' ? 'light' : 'dark') : themePref;
+
+const dark = {
   accent: '#e04a3a',
   accentEdge: '#c2231b',
   /** Rojo profundo del corte de entrada. Más oscuro que el acento a propósito:
@@ -33,7 +61,44 @@ export const palette = {
   n900: '#1b1b1a',
   black: '#0a0a0a',
   raised: '#131313',
-} as const;
+};
+
+/**
+ * El claro invierte la escala de neutros con los mismos nombres: `n200` sigue
+ * siendo "el texto" y `n900` "el fondo de un campo", así que cada pantalla
+ * queda bien en los dos sin saber cuál está activo.
+ *
+ * Tres excepciones que NO se invierten porque siempre van sobre rojo o sobre
+ * oscuro: `a100` (texto sobre el acento y sobre el corte), `a800` (fondo del
+ * chip activo) y `slam`. El acento se oscurece: el de oscuro no llega a 4.5:1
+ * sobre hueso.
+ */
+const light: Record<keyof typeof dark, string> = {
+  accent: '#b02a20',
+  accentEdge: '#8e1a13',
+  slam: '#8e1a13',
+  a100: '#f7f4ec',
+  a200: '#2e2e2b',
+  a300: '#5e1a14',
+  a400: '#b02a20',
+  a500: '#b02a20',
+  a700: '#ecd3cc',
+  a800: '#2e2e2b',
+  a900: '#ece7db',
+  n200: '#191917',
+  n300: '#2e2e2b',
+  n400: '#4c4a45',
+  n500: '#5c5953',
+  n550: '#6b6862',
+  n600: '#8d8a80',
+  n700: '#b9b5a9',
+  n800: '#ded6c4',
+  n900: '#efebe1',
+  black: '#f7f4ec',
+  raised: '#ffffff',
+};
+
+export const palette: Record<keyof typeof dark, string> = scheme === 'light' ? light : dark;
 
 export const color = {
   bg: palette.black,
@@ -47,14 +112,24 @@ export const color = {
   accent: palette.accent,
   accentDim: palette.a700,
   onAccent: palette.a100,
-  rowHighlight: 'rgba(224,74,58,0.08)',
+  rowHighlight: scheme === 'light' ? 'rgba(176,42,32,0.07)' : 'rgba(224,74,58,0.08)',
   danger: palette.a300,
   /** Fondo del corte a pantalla completa al entrar en un rol. */
   slam: palette.slam,
-  /** Hueso: el botón principal y el check hecho. Sobre el rojo profundo y sobre negro. */
+  /** Hueso: el botón principal sobre el rojo profundo. Claro en los dos temas. */
   bone: palette.a100,
-  onBone: palette.black,
+  onBone: '#0a0a0a',
+  /** El check de un set hecho: hueso sobre oscuro, gris casi negro sobre claro. */
+  done: scheme === 'light' ? '#2e2e2b' : palette.a100,
+  onDone: scheme === 'light' ? '#f7f4ec' : '#0a0a0a',
+  /** La nota fija del coach: un papel aparte, cálido, distinto de la explicación del motor. */
+  pinBg: scheme === 'light' ? '#f3ead2' : '#221f18',
+  pinBorder: scheme === 'light' ? '#e2d5b0' : '#3a352a',
+  pinText: scheme === 'light' ? '#2e2e2b' : '#ece7db',
 } as const;
+
+/** Barra de estado del sistema: texto claro sobre oscuro y al revés. */
+export const statusBarStyle = scheme === 'light' ? 'dark' : 'light';
 
 /** Colores reales de los discos, por kilo. Solo para el dibujo de la barra. */
 export const plate = {

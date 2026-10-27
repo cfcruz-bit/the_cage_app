@@ -13,7 +13,7 @@ import { useApp } from '@/stores/app';
 import { useAuth, refreshProfile } from '@/stores/auth';
 import { useSession } from '@/stores/session';
 import { useAutoSync } from '@/sync/useAutoSync';
-import { color, condensed, radius, space } from '@/theme/tokens';
+import { color, condensed, radius, space, statusBarStyle } from '@/theme/tokens';
 
 export default function RootLayout() {
   const ready = useSession((s) => s.ready);
@@ -62,7 +62,7 @@ export default function RootLayout() {
   if (!ready || user === undefined) {
     return (
       <SafeAreaProvider>
-        <StatusBar style="light" />
+        <StatusBar style={statusBarStyle} />
         <View style={styles.loading}>
           <ActivityIndicator color={color.accent} />
         </View>
@@ -76,7 +76,7 @@ export default function RootLayout() {
     if (user.mustChangePassword) {
       return (
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <StatusBar style={statusBarStyle} />
           <ChangePasswordGate />
         </SafeAreaProvider>
       );
@@ -84,7 +84,7 @@ export default function RootLayout() {
     if (expired(user)) {
       return (
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <StatusBar style={statusBarStyle} />
           <ExpiredGate endedOn={user.accessEndsOn} />
         </SafeAreaProvider>
       );
@@ -93,7 +93,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style={statusBarStyle} />
 
       {user !== null && user.renewalWarning && user.daysLeft !== null ? (
         <RenewalBanner daysLeft={user.daysLeft} />
@@ -135,7 +135,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.error}>
         <Text style={styles.errorTitle}>Esta pantalla no cargó</Text>
         <Text style={styles.errorBody}>Los sets que marcaste están guardados en el teléfono.</Text>

@@ -5,7 +5,7 @@
     "version": "0.3.0",
     "orientation": "portrait",
     "scheme": "thecage",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#0a0a0a",
     "ios": {
       "supportsTablet": false,

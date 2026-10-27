@@ -242,6 +242,20 @@ def apply_prescription(
     )
 
 
+def target_rir_for(mex: MesocycleExercise, week_number: int, is_deload: bool) -> int:
+    """El RIR que le toca a este ejercicio en esa semana.
+
+    Lo del coach manda; si no puso nada, el del ejercicio, salvo en el deload,
+    que sin RIR fijado a mano va a `DELOAD_RIR`. Lo usan la tabla del coach y la
+    sesion del atleta: si cada uno lo resolviera a su manera, el atleta podria
+    leer un RIR distinto del que ve su coach.
+    """
+    p = effective_prescription(mex, week_number)
+    if p is not None and p.target_rir is not None:
+        return p.target_rir
+    return DELOAD_RIR if is_deload else mex.target_rir
+
+
 def resolve_plan(
     exercise: Exercise,
     mex: MesocycleExercise,
@@ -436,9 +450,7 @@ def project_grid(
 
         rep_lo = p.rep_lo if p is not None and p.rep_lo is not None else mex.rep_lo
         rep_hi = p.rep_hi if p is not None and p.rep_hi is not None else mex.rep_hi
-        target_rir = (
-            p.target_rir if p is not None and p.target_rir is not None else mex.target_rir
-        )
+        target_rir = target_rir_for(mex, week, is_deload)
 
         if is_deload:
             sets = DELOAD_SETS
@@ -447,8 +459,6 @@ def project_grid(
                 if anchor_load is None
                 else round_to(anchor_load * DELOAD_LOAD_FACTOR, increment)
             )
-            if p is None or p.target_rir is None:
-                target_rir = DELOAD_RIR
             if p is None or p.rep_hi is None:
                 rep_hi = rep_lo
         else:

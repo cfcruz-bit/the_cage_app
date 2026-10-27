@@ -355,6 +355,11 @@ class SessionExerciseOut(ApiModel):
     position: int
     name: str
     muscle: str
+    equipment: str
+    #: RIR de ESTA semana: lo del coach, el del ejercicio, o el del deload.
+    target_rir: int
+    #: Nota fija del coach para el ejercicio, o null.
+    note: str | None = None
     #: null en la primera sesion de un ejercicio sin arranque: nadie ha dado
     #: todavia un peso real. El atleta lo escribe el mismo en la sesion.
     planned_load_kg: float | None
@@ -445,6 +450,32 @@ class SyncResult(ApiModel):
 class FeedbackIn(ApiModel):
     session_exercise_id: uuid.UUID
     feedback: Feedback
+
+
+class ExerciseNoteIn(ApiModel):
+    """La nota fija del coach. Vacia o solo espacios es lo mismo que null."""
+
+    note: str | None = Field(default=None, max_length=280)
+
+
+class HistorySetOut(ApiModel):
+    weight_kg: float | None
+    reps: str | None
+
+
+class HistoryEntryOut(ApiModel):
+    """Una vez anterior que el atleta hizo este ejercicio, ya cerrada."""
+
+    session_id: uuid.UUID
+    completed_at: datetime
+    week_number: int
+    is_deload: bool
+    #: True si fue en otro bloque: el historial cruza mesociclos.
+    other_block: bool
+    target_rir: int
+    #: Solo los sets marcados como hechos, en orden.
+    sets: list[HistorySetOut]
+    feedback: Feedback | None
 
 
 # ── Panel del coach ──────────────────────────────────────────────────────────
@@ -648,6 +679,7 @@ class PlanRowOut(ApiModel):
     name: str
     muscle: str
     equipment: str
+    note: str | None = None
     weeks: list[PlanCellOut]
 
 

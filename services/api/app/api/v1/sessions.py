@@ -33,6 +33,8 @@ from app.api.deps import (
 from app.api.dto import (
     CurrentSessionOut,
     FeedbackIn,
+    HistoryEntryOut,
+    HistorySetOut,
     NextUpOut,
     PlannedSetOut,
     SessionCreate,
@@ -41,7 +43,7 @@ from app.api.dto import (
     SetLogBatch,
     SyncResult,
 )
-from app.domain.schemas import LastPerformance
+from app.domain.schemas import Feedback, LastPerformance
 from app.models import (
     ExerciseFeedback,
     Mesocycle,
@@ -57,6 +59,7 @@ from app.services.planning import (
     last_performance,
     rest_seconds_for,
     sets_for,
+    target_rir_for,
     to_domain_exercise,
 )
 from app.services.schedule import (
@@ -67,6 +70,10 @@ from app.services.schedule import (
 )
 
 router = APIRouter(tags=["sessions"])
+
+#: Cuantas veces anteriores devuelve el historial de un ejercicio. Las de un
+#: bloque y pico: mas atras ya no dicen nada de la carga de hoy.
+HISTORY_LIMIT = 6
 
 
 async def _readable_session(
@@ -293,6 +300,75 @@ async def complete_session(ts: ReadableSession, session: SessionDep) -> SessionO
     return await _render(session, ts.id)
 
 
+@router.get(
+    "/sessions/{session_id}/exercises/{session_exercise_id}/history",
+    response_model=list[HistoryEntryOut],
+)
+async def exercise_history(
+    session_exercise_id: uuid.UUID, ts: ReadableSession, session: SessionDep
+) -> list[HistoryEntryOut]:
+    """Las veces anteriores que el atleta hizo este ejercicio, la mas reciente primero.
+
+    Cruza bloques: cuenta el ejercicio del catalogo, no la fila del mesociclo,
+    porque la sentadilla del bloque pasado es la misma sentadilla. Solo sesiones
+    cerradas, y nunca la actual, que ya se ve en pantalla.
+
+    Se entra por la sesion para heredar sus permisos: quien puede leer la sesion
+    puede leer el historial de sus ejercicios, y nadie mas.
+    """
+    se = await session.get(SessionExercise, session_exercise_id)
+    if se is None or se.session_id != ts.id:
+        raise NO_ENCONTRADO
+    mex = await session.get(MesocycleExercise, se.mesocycle_exercise_id)
+    meso = await session.get(Mesocycle, ts.mesocycle_id)
+    assert mex is not None and meso is not None
+
+    found = await session.execute(
+        select(SessionExercise, TrainingSession, MesocycleExercise)
+        .join(TrainingSession, SessionExercise.session_id == TrainingSession.id)
+        .join(MesocycleExercise, SessionExercise.mesocycle_exercise_id == MesocycleExercise.id)
+        .join(Mesocycle, TrainingSession.mesocycle_id == Mesocycle.id)
+        .where(
+            Mesocycle.athlete_id == meso.athlete_id,
+            MesocycleExercise.catalog_id == mex.catalog_id,
+            TrainingSession.completed_at.is_not(None),
+            TrainingSession.id != ts.id,
+        )
+        .order_by(TrainingSession.completed_at.desc())
+        .limit(HISTORY_LIMIT)
+        .options(
+            selectinload(SessionExercise.set_logs),
+            selectinload(SessionExercise.feedback),
+            selectinload(MesocycleExercise.prescriptions),
+        )
+    )
+
+    out: list[HistoryEntryOut] = []
+    for past, past_ts, past_mex in found.all():
+        fb = past.feedback
+        out.append(
+            HistoryEntryOut(
+                session_id=past_ts.id,
+                completed_at=past_ts.completed_at,
+                week_number=past_ts.week_number,
+                is_deload=past_ts.is_deload,
+                other_block=past_ts.mesocycle_id != ts.mesocycle_id,
+                target_rir=target_rir_for(past_mex, past_ts.week_number, past_ts.is_deload),
+                sets=[
+                    HistorySetOut(weight_kg=log.weight_kg, reps=log.reps)
+                    for log in sorted(past.set_logs, key=lambda log: log.idx)
+                    if log.done
+                ],
+                feedback=Feedback(
+                    joint=fb.joint, soreness=fb.soreness, pump=fb.pump, volume=fb.volume
+                )
+                if fb is not None
+                else None,
+            )
+        )
+    return out
+
+
 async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
     """Monta la respuesta: plan congelado + objetivos set a set recalculados.
 
@@ -333,6 +409,9 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                     position=se.position,
                     name=mex.catalog.name,
                     muscle=mex.catalog.muscle,
+                    equipment=mex.catalog.equipment,
+                    target_rir=target_rir_for(mex, ts.week_number, ts.is_deload),
+                    note=mex.note,
                     planned_load_kg=None,
                     planned_sets=se.planned_sets,
                     backoff_sets=se.backoff_sets,
@@ -376,6 +455,9 @@ async def _render(session: SessionDep, session_id: uuid.UUID) -> SessionOut:
                 position=se.position,
                 name=mex.catalog.name,
                 muscle=mex.catalog.muscle,
+                equipment=mex.catalog.equipment,
+                target_rir=target_rir_for(mex, ts.week_number, ts.is_deload),
+                note=mex.note,
                 planned_load_kg=se.planned_load_kg,
                 planned_sets=se.planned_sets,
                 backoff_sets=se.backoff_sets,

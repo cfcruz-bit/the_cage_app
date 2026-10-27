@@ -13,8 +13,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { reloadAppAsync } from 'expo';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import * as Updates from 'expo-updates';
 import { useApp } from '@/stores/app';
 import { useAuth } from '@/stores/auth';
@@ -23,13 +25,26 @@ import { Screen } from '@/components/Screen';
 import { Chip } from '@/components/Chip';
 import { RecordsPanel } from '@/features/records/RecordsPanel';
 import { useSession } from '@/stores/session';
-import { color, radius, space } from '@/theme/tokens';
+import { THEME_KEY, type ThemePref, color, radius, space, themePref } from '@/theme/tokens';
 import type { Unit } from '@/lib/units';
 
 const UNITS: { value: Unit; label: string }[] = [
   { value: 'kg', label: 'Kilogramos' },
   { value: 'lb', label: 'Libras' },
 ];
+
+const THEMES: { value: ThemePref; label: string }[] = [
+  { value: 'dark', label: 'Oscuro' },
+  { value: 'light', label: 'Claro' },
+  { value: 'system', label: 'Sistema' },
+];
+
+/** Los colores se fijan al arrancar (ver `theme/tokens.ts`): cambiar de tema es reiniciar. */
+function chooseTheme(value: ThemePref) {
+  if (value === themePref) return;
+  SecureStore.setItem(THEME_KEY, value);
+  void reloadAppAsync('Cambio de tema');
+}
 
 const AGGRESSIVENESS: Aggressiveness[] = ['Baja', 'Media', 'Alta'];
 
@@ -109,6 +124,23 @@ export default function SettingsScreen() {
                 label={u.label}
                 active={unit === u.value}
                 onPress={() => void setUnit(u.value)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.group}>
+          <Text style={styles.groupTitle}>Tema</Text>
+          <Text style={styles.groupHelp}>
+            La app se reinicia para aplicarlo. Lo que registraste no se pierde.
+          </Text>
+          <View style={styles.options}>
+            {THEMES.map((t) => (
+              <Chip
+                key={t.value}
+                label={t.label}
+                active={themePref === t.value}
+                onPress={() => chooseTheme(t.value)}
               />
             ))}
           </View>

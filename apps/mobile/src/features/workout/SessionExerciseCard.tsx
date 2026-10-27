@@ -43,6 +43,7 @@ interface Props {
   onToggle: (index: number) => void;
   onReport: (index: number) => void;
   onFeedback: () => void;
+  onHistory: () => void;
 }
 
 export const SessionExerciseCard = memo(function SessionExerciseCard({
@@ -54,11 +55,19 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   onToggle,
   onReport,
   onFeedback,
+  onHistory,
 }: Props) {
   const doneCount = sets.filter((s) => s.done).length;
   const allDone = doneCount === sets.length && sets.length > 0;
 
-  const equipment = exercise.exercise?.equipment;
+  const equipment = exercise.equipment ?? exercise.exercise?.equipment;
+  const meta = [
+    equipment,
+    exercise.targetRir == null ? null : `${exercise.targetRir} RIR`,
+    `descanso ${formatRest(exercise.restSeconds)}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <View style={styles.card}>
@@ -70,10 +79,17 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.name}>{exercise.name}</Text>
-            <Text style={styles.meta}>
-              {equipment ? `${equipment} · ` : ''}descanso {formatRest(exercise.restSeconds)}
-            </Text>
+            <Text style={styles.meta}>{meta}</Text>
           </View>
+          <Pressable
+            onPress={onHistory}
+            accessibilityRole="button"
+            accessibilityLabel={`Historial de ${exercise.name}`}
+            hitSlop={4}
+            style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}
+          >
+            <Ionicons name="time-outline" size={21} color={palette.n400} />
+          </Pressable>
           <View style={[styles.badge, allDone && styles.badgeDone]}>
             <Text style={[styles.badgeText, allDone && styles.badgeTextDone]}>
               {doneCount}/{sets.length}
@@ -81,12 +97,24 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
           </View>
         </View>
 
+        {/* La nota del coach va primero y en caja: es una instrucción, y se
+            repite cada semana hasta que él la quite. */}
+        {exercise.note ? (
+          <View style={styles.pin}>
+            <Ionicons name="pin-outline" size={15} color={color.pinText} />
+            <View style={styles.pinBody}>
+              <Text style={styles.pinText}>{exercise.note}</Text>
+              <Text style={styles.pinWho}>Nota de tu coach</Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* La explicación del motor. Viaja desde el servidor tal cual: es lo que
             convierte un número en una decisión que el atleta entiende. */}
         {exercise.why ? (
-          <View style={styles.note}>
-            <Ionicons name="create-outline" size={15} color={color.textMuted} />
-            <Text style={styles.noteText}>{exercise.why}</Text>
+          <View style={styles.why}>
+            <Ionicons name="sparkles-outline" size={14} color={color.textMuted} />
+            <Text style={styles.whyText}>{exercise.why}</Text>
           </View>
         ) : null}
       </View>
@@ -167,7 +195,9 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 2 },
   name: { color: color.text, fontSize: 19, fontWeight: '700', letterSpacing: -0.2 },
   meta: { color: color.textMuted, fontSize: 13 },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   badge: {
+    marginTop: 6,
     paddingHorizontal: space.sm,
     paddingVertical: 3,
     borderRadius: radius.chip,
@@ -177,18 +207,22 @@ const styles = StyleSheet.create({
   badgeDone: { borderColor: color.accent, backgroundColor: color.bgSunken },
   badgeText: { color: color.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] },
   badgeTextDone: { color: color.onAccent },
-  note: {
+  pin: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: space.sm,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    backgroundColor: color.bgSunken,
+    backgroundColor: color.pinBg,
     borderWidth: 1,
-    borderColor: color.border,
+    borderColor: color.pinBorder,
     borderRadius: radius.chip,
   },
-  noteText: { flex: 1, color: palette.n400, fontSize: 12.5, lineHeight: 17 },
+  pinBody: { flex: 1, gap: 2 },
+  pinText: { color: color.pinText, fontSize: 13, lineHeight: 18 },
+  pinWho: { color: color.textMuted, fontSize: 11 },
+  why: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  whyText: { flex: 1, color: color.textMuted, fontSize: 12.5, lineHeight: 17 },
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',
