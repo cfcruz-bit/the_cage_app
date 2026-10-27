@@ -6,7 +6,8 @@ import { ROLE_LABEL, useApp } from '@/stores/app';
 import { color, space } from '@/theme/tokens';
 
 interface Props {
-  title: string;
+  /** Texto, o varios <Text> anidados cuando una parte va en otro tono. */
+  title: ReactNode;
   subtitle?: string;
   /** Botón a la izquierda del título (volver, etc.). */
   leading?: ReactNode;

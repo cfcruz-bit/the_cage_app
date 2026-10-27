@@ -16,11 +16,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { SessionExerciseOut } from '@/api/types';
-import { SetRow } from './SetRow';
+import { SET_COLUMNS, SetRow } from './SetRow';
 import { muscleLabel } from '@/lib/muscles';
 import { formatRest } from '@/lib/prescription';
-import { type Unit, formatLoad } from '@/lib/units';
-import { color, palette, radius, space } from '@/theme/tokens';
+import type { Unit } from '@/lib/units';
+import { color, palette, radius, space, type } from '@/theme/tokens';
 
 interface ResolvedSet {
   index: number;
@@ -58,38 +58,46 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
   const doneCount = sets.filter((s) => s.done).length;
   const allDone = doneCount === sets.length && sets.length > 0;
 
+  const equipment = exercise.exercise?.equipment;
+
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.muscle}>{muscleLabel(exercise.muscle)}</Text>
-          <Text style={styles.name}>{exercise.name}</Text>
+      <View style={styles.top}>
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{muscleLabel(exercise.muscle)}</Text>
         </View>
-        <View style={[styles.badge, allDone && styles.badgeDone]}>
-          <Text style={[styles.badgeText, allDone && styles.badgeTextDone]}>
-            {doneCount}/{sets.length}
-          </Text>
+
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.name}>{exercise.name}</Text>
+            <Text style={styles.meta}>
+              {equipment ? `${equipment} · ` : ''}descanso {formatRest(exercise.restSeconds)}
+            </Text>
+          </View>
+          <View style={[styles.badge, allDone && styles.badgeDone]}>
+            <Text style={[styles.badgeText, allDone && styles.badgeTextDone]}>
+              {doneCount}/{sets.length}
+            </Text>
+          </View>
         </View>
+
+        {/* La explicación del motor. Viaja desde el servidor tal cual: es lo que
+            convierte un número en una decisión que el atleta entiende. */}
+        {exercise.why ? (
+          <View style={styles.note}>
+            <Ionicons name="create-outline" size={15} color={color.textMuted} />
+            <Text style={styles.noteText}>{exercise.why}</Text>
+          </View>
+        ) : null}
       </View>
 
-      <View style={styles.targets}>
-        <Text style={styles.target}>
-          {exercise.plannedLoadKg === null
-            ? 'Sin carga todavía'
-            : formatLoad(exercise.plannedLoadKg, unit)}{' '}
-          · {exercise.plannedSets} {exercise.backoffSets == null ? 'sets' : 'top'}
-          {exercise.backoffSets != null && exercise.backoffLoadKg != null
-            ? ` + ${exercise.backoffSets}×${exercise.backoffReps} back-off a ${formatLoad(exercise.backoffLoadKg, unit)}`
-            : ''}
-        </Text>
-        <Text style={styles.target}>
-          descanso {formatRest(exercise.restSeconds)}
-        </Text>
+      <View style={styles.tableHead}>
+        <View style={{ width: SET_COLUMNS.menu }} />
+        <Text style={styles.th}>PESO ({unit.toUpperCase()})</Text>
+        <Text style={styles.th}>REPS</Text>
+        <View style={{ width: SET_COLUMNS.result }} />
+        <Text style={[styles.th, styles.thLog]}>LOG</Text>
       </View>
-
-      {/* La explicación del motor. Viaja desde el servidor tal cual: es lo que
-          convierte un número en una decisión que el atleta entiende. */}
-      <Text style={styles.why}>{exercise.why}</Text>
 
       {sets.map((s) => (
         <SetRow
@@ -139,22 +147,26 @@ export const SessionExerciseCard = memo(function SessionExerciseCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: color.bgRaised,
+    paddingTop: space.lg,
+    paddingBottom: space.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: color.border,
+  },
+  top: { paddingHorizontal: space.lg, gap: space.sm },
+  chip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
     borderWidth: 1,
     borderColor: color.border,
-    borderRadius: radius.card,
-    overflow: 'hidden',
+    borderRadius: radius.chip,
+    backgroundColor: color.bgSunken,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: space.sm,
-    padding: space.md,
-    paddingBottom: space.sm,
-  },
+  chipText: { ...type.label, color: palette.n400 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   headerText: { flex: 1, gap: 2 },
-  muscle: { color: color.textMuted, fontSize: 12.5 },
-  name: { color: color.text, fontSize: 16, fontWeight: '600' },
+  name: { color: color.text, fontSize: 19, fontWeight: '700', letterSpacing: -0.2 },
+  meta: { color: color.textMuted, fontSize: 13 },
   badge: {
     paddingHorizontal: space.sm,
     paddingVertical: 3,
@@ -165,26 +177,33 @@ const styles = StyleSheet.create({
   badgeDone: { borderColor: color.accent, backgroundColor: color.bgSunken },
   badgeText: { color: color.textMuted, fontSize: 12, fontVariant: ['tabular-nums'] },
   badgeTextDone: { color: color.onAccent },
-  targets: {
+  note: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: space.md,
-    paddingBottom: 2,
+    alignItems: 'flex-start',
     gap: space.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: color.bgSunken,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.chip,
   },
-  target: { color: color.textMuted, fontSize: 12.5 },
-  why: {
-    color: color.textFaint,
-    fontSize: 12,
-    lineHeight: 16,
-    paddingHorizontal: space.md,
-    paddingBottom: space.sm,
+  noteText: { flex: 1, color: palette.n400, fontSize: 12.5, lineHeight: 17 },
+  tableHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 34,
+    marginTop: space.sm,
+    paddingLeft: space.xs,
+    paddingRight: space.md,
   },
+  th: { ...type.label, flex: 1, color: color.textMuted, textAlign: 'center' },
+  thLog: { flex: 0, width: SET_COLUMNS.check },
   feedback: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingHorizontal: space.md,
+    marginHorizontal: space.lg,
     paddingVertical: space.md,
     borderTopWidth: 1,
     borderTopColor: color.border,

@@ -3,8 +3,12 @@
  *
  * El atleta NO edita la prescripción: lee el objetivo que puso su coach y lo
  * marca como hecho. Si no le salió —se quedó corto de reps, cambió el peso—
- * abre el reporte de desviación y cuenta qué pasó. Ese reporte es lo único que
- * llega al motor, y solo cuando hubo diferencia.
+ * abre el reporte de desviación desde el ⋮ y cuenta qué pasó. Ese reporte es lo
+ * único que llega al motor, y solo cuando hubo diferencia.
+ *
+ * Se pinta como una fila de tabla: ⋮ · peso · reps · resultado · check. Las
+ * columnas las fija la cabecera de SessionExerciseCard; si cambias un ancho
+ * aquí, cámbialo allí.
  *
  * Es el componente más caliente de la app: va memoizado y solo recibe
  * primitivos y callbacks estables.
@@ -39,6 +43,9 @@ interface Props {
   onReport: () => void;
 }
 
+/** Anchos de las columnas fijas. La cabecera de la tabla usa los mismos. */
+export const SET_COLUMNS = { menu: 34, result: 34, check: 48 } as const;
+
 export const SetRow = memo(function SetRow({
   index,
   unit,
@@ -55,65 +62,69 @@ export const SetRow = memo(function SetRow({
 }: Props) {
   const hasTarget = targetWeightKg !== null && targetReps !== null;
   const loggedRepsN = loggedReps == null ? null : parseInt(loggedReps, 10);
-  const deviated =
-    hasTarget &&
-    done &&
-    ((loggedWeightKg != null && Math.abs(loggedWeightKg - targetWeightKg) > 0.01) ||
-      (loggedRepsN != null && loggedRepsN !== targetReps));
+  const weightChanged =
+    hasTarget && done && loggedWeightKg != null && Math.abs(loggedWeightKg - targetWeightKg) > 0.01;
+  const repsChanged = hasTarget && done && loggedRepsN != null && loggedRepsN !== targetReps;
+  const deviated = weightChanged || repsChanged;
+
+  const shownWeight = loggedWeightKg ?? targetWeightKg;
+  const shownReps = loggedRepsN ?? targetReps;
+  // Más tonelaje que el pautado cuenta como "por encima", aunque baje una de las dos.
+  const above =
+    deviated && (shownWeight ?? 0) * (shownReps ?? 0) > targetWeightKg * targetReps;
+  // En la tabla, la explicación del set solo acompaña al que toca: en todas las
+  // filas pendientes tapaba los números.
+  const note = done ? null : !hasTarget ? 'Registra tu peso con el check.' : isNext ? why : null;
 
   return (
     <View style={[styles.row, isNext && styles.rowNext]}>
-      <View style={styles.head}>
-        <View style={[styles.indexBox, kind !== undefined && styles.indexBoxTagged]}>
-          <Text style={styles.index}>{index + 1}</Text>
+      <View style={styles.cols}>
+        <Pressable
+          onPress={onReport}
+          accessibilityRole="button"
+          accessibilityLabel={
+            done ? `Corregir el set ${index + 1}` : `No pude con el set ${index + 1}`
+          }
+          hitSlop={{ top: 8, bottom: 8, left: 8 }}
+          style={({ pressed }) => [styles.menu, pressed && styles.pressed]}
+        >
+          <Ionicons name="ellipsis-vertical" size={16} color={color.textFaint} />
+        </Pressable>
+
+        <View style={styles.cell}>
           {kind !== undefined ? (
             <Text style={styles.kind}>{kind === 'top' ? 'TOP' : 'B-O'}</Text>
           ) : null}
+          <Text style={[styles.value, done && styles.valueDone, weightChanged && styles.valueChanged]}>
+            {shownWeight === null ? '—' : formatNumber(shownWeight, unit)}
+          </Text>
+          {weightChanged ? (
+            <Text style={styles.was}>{formatNumber(targetWeightKg, unit)}</Text>
+          ) : null}
         </View>
 
-        <View style={styles.target}>
-          {hasTarget ? (
-            <>
-              <Text style={[styles.prescription, done && !deviated && styles.prescriptionDone]}>
-                {formatNumber(targetWeightKg, unit)} {unit} × {targetReps}
-              </Text>
-              {deviated ? (
-                <Text style={styles.actual}>
-                  hiciste {formatNumber(loggedWeightKg ?? targetWeightKg, unit)} {unit} ×{' '}
-                  {loggedRepsN ?? targetReps}
-                </Text>
-              ) : null}
-            </>
-          ) : loggedWeightKg !== null ? (
-            <Text style={styles.prescription}>
-              {formatNumber(loggedWeightKg, unit)} {unit} × {loggedRepsN ?? '—'}
-            </Text>
-          ) : (
-            <Text style={styles.noTarget}>— registra tu peso</Text>
-          )}
+        <View style={styles.cell}>
+          <Text style={[styles.value, done && styles.valueDone, repsChanged && styles.valueChanged]}>
+            {shownReps ?? '—'}
+          </Text>
+          {repsChanged ? <Text style={styles.was}>{targetReps}</Text> : null}
         </View>
 
-        {hasTarget ? (
-          done ? (
-            <Pressable
-              onPress={onReport}
-              accessibilityRole="button"
-              accessibilityLabel={`Corregir el set ${index + 1}`}
-              style={({ pressed }) => [styles.report, pressed && styles.pressed]}
-            >
-              <Text style={styles.reportText}>Corregir</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={onReport}
-              accessibilityRole="button"
-              accessibilityLabel={`No pude con el set ${index + 1}`}
-              style={({ pressed }) => [styles.report, pressed && styles.pressed]}
-            >
-              <Text style={styles.reportText}>No pude</Text>
-            </Pressable>
-          )
-        ) : null}
+        <View
+          style={styles.result}
+          accessible={done}
+          accessibilityLabel={
+            deviated ? 'Reportado, el motor lo tendrá en cuenta' : 'Objetivo cumplido'
+          }
+        >
+          {done && hasTarget ? (
+            <Ionicons
+              name={deviated ? (above ? 'trending-up' : 'trending-down') : 'radio-button-on-outline'}
+              size={deviated ? 18 : 19}
+              color={deviated ? (above ? palette.a300 : color.accent) : color.textFaint}
+            />
+          ) : null}
+        </View>
 
         <Pressable
           onPress={hasTarget ? onToggle : onReport}
@@ -129,7 +140,7 @@ export const SetRow = memo(function SetRow({
           hitSlop={8}
           style={({ pressed }) => [
             styles.check,
-            done ? styles.checkDone : styles.checkPending,
+            done ? styles.checkDone : isNext ? styles.checkNext : styles.checkPending,
             pressed && styles.pressed,
           ]}
         >
@@ -141,59 +152,53 @@ export const SetRow = memo(function SetRow({
         </Pressable>
       </View>
 
-      {!done && why ? (
+      {note ? (
         <Text style={styles.why} numberOfLines={2}>
-          {why}
+          {note}
         </Text>
       ) : null}
-
-      {deviated ? <Text style={styles.deviatedNote}>Reportado · el motor lo tendrá en cuenta</Text> : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   row: {
-    paddingVertical: space.md,
-    paddingHorizontal: space.md,
+    minHeight: 60,
+    justifyContent: 'center',
+    paddingVertical: space.xs,
+    paddingLeft: space.xs,
+    paddingRight: space.md,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: color.border,
-    gap: 4,
   },
   rowNext: { backgroundColor: color.rowHighlight },
-  head: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  indexBox: { width: 14 },
-  indexBoxTagged: { width: 32 },
-  index: {
-    color: color.textFaint,
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
+  cols: { flexDirection: 'row', alignItems: 'center' },
+  menu: {
+    width: SET_COLUMNS.menu,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  kind: { color: color.accent, fontSize: 12, letterSpacing: 0.6 },
-  target: { flex: 1, gap: 2 },
-  prescription: {
+  cell: { flex: 1, alignItems: 'center' },
+  kind: { color: color.accent, fontSize: 10, fontWeight: '500', letterSpacing: 1.6 },
+  value: {
     color: color.text,
     fontSize: 18,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
-  prescriptionDone: { color: color.textMuted },
-  noTarget: { color: color.textFaint, fontSize: 15, fontStyle: 'italic' },
-  actual: { color: palette.a300, fontSize: 12, fontVariant: ['tabular-nums'] },
-  report: {
-    minHeight: 48,
-    minWidth: 48,
-    paddingHorizontal: space.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: color.border,
-    borderRadius: radius.chip,
+  valueDone: { color: color.textMuted },
+  valueChanged: { color: palette.a300 },
+  was: {
+    color: color.textFaint,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    textDecorationLine: 'line-through',
   },
-  reportText: { color: color.text, fontSize: 13 },
+  result: { width: SET_COLUMNS.result, alignItems: 'center' },
   check: {
-    width: 48,
-    height: 48,
+    width: SET_COLUMNS.check,
+    height: SET_COLUMNS.check,
     borderRadius: radius.chip,
     borderWidth: 1,
     alignItems: 'center',
@@ -201,7 +206,12 @@ const styles = StyleSheet.create({
   },
   checkDone: { backgroundColor: color.bone, borderColor: color.bone },
   checkPending: { backgroundColor: 'transparent', borderColor: color.border },
+  checkNext: { backgroundColor: 'transparent', borderColor: color.accent },
   pressed: { opacity: 0.6 },
-  why: { color: color.textMuted, fontSize: 12, marginLeft: 26 },
-  deviatedNote: { color: color.textFaint, fontSize: 12, marginLeft: 26 },
+  why: {
+    color: color.textMuted,
+    fontSize: 12,
+    marginLeft: SET_COLUMNS.menu,
+    paddingBottom: space.sm,
+  },
 });

@@ -271,11 +271,22 @@ export default function WorkoutScreen() {
 
   return (
     <Screen
-      title={session.dayLabel.toUpperCase()}
-      subtitle={`Semana ${session.weekNumber} · ${summary.done} de ${summary.total} sets · ${formatLoad(
-        Math.round(summary.volumeKg),
-        unit,
-      )} de volumen`}
+      title={
+        <>
+          SEMANA {session.weekNumber}{' '}
+          <Text style={styles.titleDay}>DÍA {session.dayNumber}</Text>
+        </>
+      }
+      subtitle={`${
+        // Sin nombre propio el servidor manda "Día N", que ya está en el título.
+        session.dayLabel === `Día ${session.dayNumber}` ? '' : `${session.dayLabel} · `
+      }${formatLoad(Math.round(summary.volumeKg), unit)} de volumen`}
+      trailing={
+        <Text style={styles.progress} accessibilityLabel={`${summary.done} de ${summary.total} sets`}>
+          {summary.done}
+          <Text style={styles.progressTotal}>/{summary.total}</Text>
+        </Text>
+      }
     >
       {stale || pending > 0 ? (
         <View style={styles.banner}>
@@ -490,7 +501,10 @@ function SessionDone({
 }
 
 const styles = StyleSheet.create({
-  list: { padding: space.lg, gap: space.md },
+  list: { paddingBottom: space.lg },
+  titleDay: { color: color.textFaint },
+  progress: { ...condensed, color: color.text, fontSize: 28, fontVariant: ['tabular-nums'] },
+  progressTotal: { color: color.textFaint, fontSize: 20 },
   upNext: { color: color.bone, fontSize: 14, lineHeight: 19 },
   center: {
     alignItems: 'center',
@@ -530,6 +544,7 @@ const styles = StyleSheet.create({
   bannerText: { color: color.textMuted, fontSize: 12, flex: 1, lineHeight: 16 },
 
   doneBanner: {
+    margin: space.lg,
     padding: space.md,
     borderRadius: radius.card,
     backgroundColor: color.slam,
