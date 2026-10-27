@@ -31,7 +31,10 @@ _CHECK = (
 
 
 def upgrade() -> None:
-    for table, name in (("prescriptions", "tecnica_completa"), ("session_exercises", "tecnica_congelada")):
+    for table, name in (
+        ("prescriptions", "tecnica_completa"),
+        ("session_exercises", "tecnica_congelada"),
+    ):
         with op.batch_alter_table(table, schema=None) as batch_op:
             batch_op.add_column(sa.Column("technique", sa.String(length=12), nullable=True))
             batch_op.add_column(sa.Column("technique_rounds", sa.Integer(), nullable=True))
@@ -40,7 +43,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for table, name in (("session_exercises", "tecnica_congelada"), ("prescriptions", "tecnica_completa")):
+    for table, name in (
+        ("session_exercises", "tecnica_congelada"),
+        ("prescriptions", "tecnica_completa"),
+    ):
         with op.batch_alter_table(table, schema=None) as batch_op:
             batch_op.drop_constraint(name, type_="check")
             batch_op.drop_column("technique_amount")
